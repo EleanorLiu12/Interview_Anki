@@ -1,0 +1,679 @@
+@@ 4d49c0bc10
+Q: What is RAG? Which LLM problems does it solve?
+A:
+Retrieval-Augmented Generation: before generating, <b>retrieve</b> relevant content from an external knowledge base and put it in the prompt as context, so the LLM answers from evidence.<br>
+It solves:<ul><li><b>Stale knowledge</b>: use the latest data without retraining</li><li><b>Private knowledge</b>: company documents, codebases</li><li><b>Hallucination</b>: answers have a basis and can cite sources</li><li><b>Traceability/control</b>: updating or deleting knowledge only changes the index; permissions can be enforced</li></ul>
+@@ d314adbea2
+Q: Draw or describe the two pipelines of a standard RAG system.
+A:
+<b>Offline indexing (ingestion)</b>: data sources → load/parse (PDF, HTML, code) → clean → split into chunks → extract metadata → embedding → write to a vector store (+ keyword index)<br>
+<b>Online query</b>: user question → (query rewriting/routing) → retrieve top-k → (filter, rerank, dedupe) → assemble context + prompt → LLM generates → cite sources / post-process<br>
+The LlamaIndex equivalents: Reader → NodeParser → IngestionPipeline → VectorStoreIndex → Retriever → NodePostprocessor → ResponseSynthesizer.
+@@ a34ffe700a
+Q: How do you choose between RAG and fine-tuning?
+A:
+<table><tr><th></th><th>RAG</th><th>Fine-tuning</th></tr>
+<tr><td>Best for</td><td>Injecting <b>knowledge</b> (facts, documents) that changes often</td><td>Changing <b>behavior/format/style</b>, domain language, task-specific ability</td></tr>
+<tr><td>Update cost</td><td>Low: just change the index</td><td>High: needs retraining</td></tr>
+<tr><td>Traceability</td><td>Can cite sources</td><td>Hard</td></tr>
+<tr><td>Latency</td><td>One extra retrieval</td><td>No extra retrieval</td></tr></table>
+They are often combined in practice: fine-tune the embedding/reranker or generator, and let RAG supply the knowledge.
+@@ 70467ad731
+Q: With long-context models (a million tokens), is RAG still necessary?
+A:
+Still necessary, but its role is changing:<ul><li><b>Cost and latency</b>: filling the context on every request makes prefill expensive and TTFT high</li>
+<li><b>Lost in the middle</b>: information in the middle of a long context is used less well</li>
+<li>Knowledge bases far exceed the context window (millions of documents)</li><li>Permission filtering, traceability, incremental updates</li></ul>
+Trend: RAG handles "coarse filtering + permissions" and long context handles "close reading"; fixed documents can be reused through prefix/KV caches (connects to your KV-cache research).
+@@ 59fc5a0229
+Q: What is the difference between Naive RAG, Advanced RAG and Modular / Agentic RAG?
+A:
+<ul><li><b>Naive</b>: chunk → vector retrieve top-k → generate directly</li>
+<li><b>Advanced</b>: adds optimization before retrieval (query rewriting, HyDE, multi-query) and after it (rerank, compression, dedupe); better chunking (hierarchical, sentence window), hybrid search</li>
+<li><b>Modular / Agentic</b>: routing, multi-step retrieval, tool calls, self-reflection (Self-RAG, CRAG), with an agent deciding when and what to retrieve</li></ul>
+@@ 76235d6f15
+Q: What are the common failure points of a RAG system?
+A:
+<ol><li><b>Data layer</b>: parsing errors (lost table/PDF layout), or the answer simply isn't in the knowledge base</li>
+<li><b>Chunking</b>: the answer gets cut off, or chunks lack context (unclear what "it" refers to)</li>
+<li><b>Retrieval</b>: not recalled (semantic mismatch, proper nouns/IDs), wrong ranking, top-k too small</li>
+<li><b>Context assembly</b>: truncated beyond the window, too much noise, lost in the middle</li>
+<li><b>Generation</b>: ignores the context, hallucinates, answers the wrong question, wrong format</li></ol>
+When debugging, <b>evaluate retrieval and generation separately</b> to locate the failing layer first.
+@@ 3e3ce28aff
+Q: Why is chunking needed? How do you trade off chunk size?
+A:
+Reasons: embedding models have input limits; one vector for a whole document dilutes its meaning; LLM context is limited.<br>
+<ul><li><b>Chunks too small</b>: precise meaning, but missing context, and answers may be cut off</li>
+<li><b>Chunks too large</b>: complete context, but the embedding is diluted, retrieval precision falls, and more tokens are used</li></ul>
+A common starting point: 256–1024 tokens with 10–20% overlap; tune with an eval set. LlamaIndex defaults to <code>SentenceSplitter</code> with chunk_size=1024 and chunk_overlap=200 (adjustable through <code>Settings.chunk_size</code>).
+@@ fbe8f1e85e
+Q: What are the common chunking strategies?
+A:
+<ul><li><b>Fixed length / token</b>: <code>TokenTextSplitter</code></li>
+<li><b>By sentence/paragraph</b> (tries not to cut sentences): <code>SentenceSplitter</code></li>
+<li><b>Recursive</b>: tries paragraph → sentence → word in turn</li>
+<li><b>Structure-aware</b>: Markdown headings, HTML, JSON, <b>code by AST</b> (<code>MarkdownNodeParser</code>, <code>CodeSplitter</code>)</li>
+<li><b>Semantic</b>: splits where embedding similarity between adjacent sentences drops sharply (<code>SemanticSplitterNodeParser</code>)</li>
+<li><b>Hierarchical</b>: generates large, medium and small chunks together (<code>HierarchicalNodeParser</code>)</li>
+<li><b>Sentence window</b>: indexes single sentences and expands to a context window after retrieval (<code>SentenceWindowNodeParser</code>)</li></ul>
+@@ 5c5ad1718f
+Q: How do you parse complex PDFs (tables, multiple columns, images)?
+A:
+<ul><li>Plain PDF text extraction (pypdf) scrambles tables and column order</li>
+<li>Layout-aware parsing: <b>LlamaParse</b> (LlamaIndex's hosted parsing service, which outputs Markdown and keeps table structure), Unstructured, Docling, OCR</li>
+<li>Tables: convert to Markdown/HTML tables, or generate a summary per table, index the summary, and return the original table</li>
+<li>Images/charts: have a multimodal model describe them, or use multimodal embeddings</li></ul>
+Principle: <b>garbage in, garbage out</b>. Parsing quality often matters more than changing the embedding model.
+@@ 37481a0cbc
+Q: What is metadata used for in RAG?
+A:
+<ul><li><b>Filtering</b>: pre-filter by time, product, version, permissions or language (metadata filtering)</li>
+<li><b>Enriching embeddings</b>: append titles and section paths to chunk text to fill in context</li>
+<li><b>Citations</b>: return the source file, page number, URL</li>
+<li><b>Ranking</b>: weight by recency</li></ul>
+LlamaIndex: the Node's <code>metadata</code> field; <code>excluded_embed_metadata_keys</code> / <code>excluded_llm_metadata_keys</code> control which metadata goes into embedding or to the LLM; Extractors (<code>TitleExtractor</code>, <code>SummaryExtractor</code>, <code>QuestionsAnsweredExtractor</code>, <code>KeywordExtractor</code>) can generate metadata automatically.
+@@ 06a1d3a2b2
+Q: What is Contextual Retrieval (contextualized chunks)?
+A:
+Problem: isolated chunks often lack key context (e.g. "the company's Q2 revenue grew 3%" without saying which company).<br>
+Approach: before indexing, have an LLM write a short <b>context note</b> for each chunk (what it covers within the whole document), prepend it to the chunk, then build the embedding and BM25 indexes.<br>
+Prompt caching lowers the cost (the whole document is a cacheable prefix). Proposed by Anthropic in 2024; its report shows a significant drop in retrieval failure rates when combined with hybrid search + rerank.
+@@ 82923e810a
+Q: How do you do incremental updates and deduplication for a knowledge base?
+A:
+<ul><li>Give each document a stable <b>doc_id</b> (e.g. its file path) and record a content hash</li>
+<li>Unchanged → skip; changed → delete old nodes and reinsert (upsert); removed from source → delete from the index</li>
+<li>LlamaIndex: <code>IngestionPipeline(docstore=..., vector_store=...)</code> uses the docstore for document management and dedup (docstrategy: upserts / duplicates_only / upserts_and_delete); <code>index.refresh_ref_docs()</code>; <code>IngestionCache</code> caches each transformation's result to avoid re-embedding</li></ul>
+@@ 629f3ca336
+Q: What is LlamaIndex's IngestionPipeline? Write an example.
+A:
+Chains a series of <b>transformations</b> (chunking, metadata extraction, embedding) into a pipeline, with support for caching, dedup, parallelism and writing directly to a vector store.
+<pre><code>from llama_index.core.ingestion import IngestionPipeline, IngestionCache
+from llama_index.core.node_parser import SentenceSplitter
+from llama_index.core.extractors import TitleExtractor
+from llama_index.embeddings.openai import OpenAIEmbedding
+pipeline = IngestionPipeline(
+    transformations=[
+        SentenceSplitter(chunk_size=512, chunk_overlap=50),
+        TitleExtractor(),
+        OpenAIEmbedding(),
+    ],
+    vector_store=vector_store,   # optional: write directly
+    docstore=docstore,           # optional: dedup/incremental
+    cache=IngestionCache(),
+)
+nodes = pipeline.run(documents=docs, num_workers=4)
+index = VectorStoreIndex.from_vector_store(vector_store)</code></pre>
+@@ df186cd15f
+Q: What is an embedding? How do you measure vector similarity?
+A:
+An embedding maps text to a dense vector, so semantically similar text ends up close together.<br>
+Similarity:<ul><li><b>Cosine similarity</b> (most common; considers only direction)</li><li><b>Dot product</b> (equivalent to cosine after normalization)</li><li>Euclidean distance L2</li></ul>
+Note: queries and documents must use the <b>same</b> embedding model; some models need different prefixes for queries and documents (e.g. "query: " / "passage: " for bge and e5).
+@@ 60e22cd70d
+Q: What is the difference between a bi-encoder and a cross-encoder?
+A:
+<ul><li><b>Bi-encoder</b>: encodes the query and document <b>separately</b> into vectors, then computes similarity. Document vectors can be precomputed → fast, suited to recall at massive scale. But there is no fine-grained interaction between query and document</li>
+<li><b>Cross-encoder</b>: feeds (query, document) <b>together</b> into the model and directly outputs a relevance score. Highly accurate, but runs the model for every pair → slow, suited only to reranking a few candidates</li></ul>
+Typical two-stage setup: bi-encoder recalls top-50/100 → cross-encoder (e.g. bge-reranker, Cohere Rerank) reranks to top-5.
+@@ 2effbb1b3a
+Q: How do you choose an embedding model?
+A:
+Consider:<ul><li>Retrieval quality: check the Retrieval tasks on the <b>MTEB</b> leaderboard, but always evaluate on <b>your own data</b></li>
+<li>Language (Chinese/English, multilingual) and domain (code, legal)</li><li>Maximum input length, vector dimension (storage/speed)</li>
+<li>Hosted APIs (OpenAI text-embedding-3, Cohere, Voyage) vs open-source self-hosting (bge, e5, gte, nomic): cost, privacy, latency</li>
+<li>Whether it supports Matryoshka (truncatable dimensions)</li></ul>
+Changing models = re-embedding everything.
+@@ 2f7e491a9e
+Q: What ANN indexes do vector databases use? How does HNSW work?
+A:
+Exact kNN is O(N), so large scale needs <b>approximate nearest neighbors (ANN)</b>:<ul>
+<li><b>HNSW</b>: a multi-layer graph (similar to a skip list); sparse upper layers navigate quickly and dense lower layers search finely. High recall and speed, but high memory use and slow builds. Parameters: M (connections per node), ef_construction, ef_search (larger is more accurate and slower)</li>
+<li><b>IVF</b>: clusters vectors into buckets and searches only the nearest nprobe buckets</li>
+<li><b>PQ (product quantization)</b>: compresses vectors to save memory, often combined with IVF (IVF-PQ)</li>
+<li>DiskANN: SSD-based large-scale indexing</li></ul>
+Tradeoff: recall vs latency vs memory.
+@@ 4be802d18c
+Q: How do you choose among common vector databases?
+A:
+<ul><li><b>Local/lightweight</b>: FAISS (a library, not a database), Chroma, LanceDB</li>
+<li><b>Hosted</b>: Pinecone</li><li><b>Open-source services</b>: Qdrant, Weaviate, Milvus</li>
+<li><b>Adding vectors to an existing database</b>: PostgreSQL + <b>pgvector</b>, OpenSearch/Elasticsearch (also supports BM25 → hybrid search), Redis</li>
+<li>AWS: OpenSearch Serverless, Aurora pgvector, S3 Vectors, Bedrock Knowledge Bases</li></ul>
+Consider: scale, metadata filtering, hybrid search, multi-tenancy, operating cost, and whether you need transactions and joins with existing data.<br>
+LlamaIndex connects to dozens of vector stores through <code>StorageContext(vector_store=...)</code>.
+@@ 4bda04c48f
+Q: What is hybrid search, and why is it needed?
+A:
+<b>Dense retrieval</b> (embeddings) is good at semantic similarity (synonyms, paraphrases) but poor at <b>exact matching</b>: proper nouns, product models, error codes, IDs, rare words.<br>
+<b>Sparse retrieval</b> (BM25 / SPLADE) is good at exact keyword matching.<br>
+Hybrid search: recall from both, then fuse the rankings → more robust recall.<br>
+LlamaIndex: <code>BM25Retriever</code> + a vector retriever, fused with <code>QueryFusionRetriever</code>; or a vector store with native hybrid search (<code>vector_store_query_mode="hybrid"</code>, with an alpha weight).
+@@ 1957031c57
+Q: How does BM25 work?
+A:
+A classic term-frequency ranking function, an improvement on TF-IDF:<ul>
+<li><b>IDF</b>: rarer terms get more weight</li>
+<li><b>TF saturation</b>: more occurrences bring diminishing returns (parameter k1)</li>
+<li><b>Document length normalization</b>: long documents naturally have more terms and are penalized (parameter b)</li></ul>
+Pros: no training, interpretable, strong at exact keyword matching. Cons: doesn't understand synonyms or meaning.
+@@ c4a3c5e6fa
+Q: What is RRF (Reciprocal Rank Fusion)?
+A:
+A way to fuse multiple retrieval results using only <b>ranks</b>, not raw scores (scores from different retrievers aren't comparable):<br>
+<code>score(d) = Σ 1 / (k + rank_i(d))</code>, with k commonly 60.<br>
+Documents ranked highly in several lists score the highest. Simple, robust, and needs no score normalization.<br>
+LlamaIndex: <code>QueryFusionRetriever(mode="reciprocal_rerank")</code>, plus modes such as <code>relative_score</code> and <code>dist_based_score</code>.
+@@ 850ca01924
+Q: What is reranking, and why does it improve results so much?
+A:
+The recall stage aims for <b>recall</b> (more candidates); the rerank stage uses a stronger model to aim for <b>precision</b>.<br>
+A cross-encoder reranker sees the full interaction between query and document, so it judges better than a bi-encoder; it can also filter out low-relevance chunks, reducing noise and tokens.<br>
+In LlamaIndex it is a node postprocessor: <code>SentenceTransformerRerank</code>, <code>CohereRerank</code>, <code>LLMRerank</code> (scores with an LLM; expensive but flexible).
+<pre><code>query_engine = index.as_query_engine(
+    similarity_top_k=20,
+    node_postprocessors=[SentenceTransformerRerank(
+        model="cross-encoder/ms-marco-MiniLM-L-6-v2", top_n=5)])</code></pre>
+@@ 63f3d96c9d
+Q: What is ColBERT / late interaction?
+A:
+Sits between bi-encoders and cross-encoders: <b>every token</b> of the query and document is encoded into a vector (documents can be precomputed), and scoring takes each query token's maximum similarity with the document tokens, then sums them (MaxSim).<br>
+More fine-grained than a bi-encoder and faster than a cross-encoder; the cost is large storage (one vector per token). ColPali extends it to document image retrieval.
+@@ 26fcbd3bc5
+Q: What is LlamaIndex? How does its positioning differ from LangChain?
+A:
+LlamaIndex is a framework for <b>"LLM + your data"</b>: data connectors, parsing, indexing, retrieval, query engines, plus agents and event-driven Workflows.<br>
+<ul><li><b>LlamaIndex</b>: centered on data/retrieval, with rich RAG components and advanced retrieval strategies out of the box</li>
+<li><b>LangChain / LangGraph</b>: more general LLM application orchestration; LangGraph leans toward stateful, graph-style agent orchestration</li></ul>
+They can be mixed. In an interview you can say you chose LlamaIndex because its retrieval components are mature and its abstractions clear.
+@@ bc4758b394
+Q: What are LlamaIndex's core abstractions: Document, Node, Index, Retriever, QueryEngine?
+A:
+<ul><li><b>Document</b>: a container for a data source (text + metadata + id)</li>
+<li><b>Node (TextNode)</b>: the smallest unit after splitting a Document, with metadata and <b>relationships</b> (source/prev/next/parent/child)</li>
+<li><b>Index</b>: a data structure organizing Nodes for retrieval (e.g. VectorStoreIndex)</li>
+<li><b>Retriever</b>: given a query, returns a list of relevant <code>NodeWithScore</code></li>
+<li><b>NodePostprocessor</b>: filters/reranks/transforms after retrieval</li>
+<li><b>ResponseSynthesizer</b>: gives nodes + query to the LLM to generate the answer</li>
+<li><b>QueryEngine</b>: an end-to-end Q&amp;A interface of Retriever + Postprocessor + Synthesizer; <b>ChatEngine</b> is the version with conversation history</li></ul>
+@@ 536fcf69f8
+Q: Write a minimal LlamaIndex RAG example, including persisting and loading the index.
+A:
+<pre><code>from llama_index.core import (VectorStoreIndex, SimpleDirectoryReader,
+    StorageContext, load_index_from_storage)
+docs = SimpleDirectoryReader("./data").load_data()
+index = VectorStoreIndex.from_documents(docs)
+index.storage_context.persist(persist_dir="./storage")
+# load later
+sc = StorageContext.from_defaults(persist_dir="./storage")
+index = load_index_from_storage(sc)
+qe = index.as_query_engine(similarity_top_k=5)
+resp = qe.query("question")
+print(resp, resp.source_nodes)   # source_nodes are used for citations</code></pre>
+By default VectorStoreIndex lives <b>in memory</b>; production should use an external vector store.
+@@ 31094c20be
+Q: What is Settings in LlamaIndex, and what did it replace?
+A:
+<code>Settings</code> is a global singleton that provides default <code>llm</code>, <code>embed_model</code>, <code>node_parser</code>/<code>transformations</code>, <code>chunk_size</code>, <code>tokenizer</code>, <code>callback_manager</code>, <code>context_window</code>, <code>num_output</code> and so on. Components use Settings when nothing is passed explicitly.<br>
+Since v0.10 it replaces the old <b>ServiceContext</b>. v0.10 also split the package into <code>llama-index-core</code> + separate integration packages (e.g. <code>llama-index-llms-openai</code>, <code>llama-index-vector-stores-qdrant</code>).
+<pre><code>from llama_index.core import Settings
+Settings.llm = OpenAI(model="gpt-4o-mini")
+Settings.embed_model = HuggingFaceEmbedding("BAAI/bge-small-en-v1.5")
+Settings.chunk_size = 512</code></pre>
+Local override: pass arguments directly to <code>VectorStoreIndex(..., embed_model=...)</code> or <code>as_query_engine(llm=...)</code>, which take priority over the global settings.
+@@ 92b1eb2ce2
+Q: What kinds of storage does StorageContext contain?
+A:
+<ul><li><b>docstore</b>: stores the original Node/Document text</li>
+<li><b>index_store</b>: stores the index's metadata structure</li>
+<li><b>vector_store</b>: stores vectors (many external vector stores also hold the text, so no separate docstore is needed)</li>
+<li><b>graph_store / property_graph_store</b>: knowledge graphs</li></ul>
+All can be swapped for persistent backends such as Redis, MongoDB and Postgres.
+@@ e9275c6ec0
+Q: What index types does LlamaIndex have, and what is each good for?
+A:
+<ul><li><b>VectorStoreIndex</b>: the most common; semantic top-k retrieval</li>
+<li><b>SummaryIndex</b> (formerly ListIndex): stores all nodes in order and sends all of them (or those filtered by LLM/embedding) to synthesis at query time → suited to <b>full-document summaries</b></li>
+<li><b>TreeIndex</b>: builds a summary tree bottom-up</li>
+<li><b>KeywordTableIndex</b>: keyword → node mapping</li>
+<li><b>PropertyGraphIndex</b>: knowledge graph (entities + relationships), supporting graph traversal + vector hybrid retrieval</li>
+<li><b>DocumentSummaryIndex</b>: generates a summary per document, selects documents by summary, then fetches content</li></ul>
+@@ e2e8e342e1
+Q: How do the response_mode options of the Response Synthesizer differ?
+A:
+<ul><li><b>compact</b> (default): packs as many chunks as fit into one prompt and refines only if they don't → fewer LLM calls</li>
+<li><b>refine</b>: iterates chunk by chunk: answers from the first, then refines with each later chunk → detailed, but calls = number of chunks</li>
+<li><b>tree_summarize</b>: summarizes in groups, then recursively summarizes the summaries → suited to <b>summary</b> questions</li>
+<li><b>simple_summarize</b>: concatenates everything in one call (truncates if too long)</li>
+<li><b>accumulate</b> / <b>compact_accumulate</b>: answers for each chunk separately, then concatenates</li>
+<li><b>no_text</b>: retrieves without generating; used to debug retrieval</li></ul>
+@@ 50abe3bbd8
+Q: What is the difference between a Query Engine and a Chat Engine? What are the Chat Engine modes?
+A:
+QueryEngine is stateless, single-turn Q&amp;A; <b>ChatEngine</b> maintains conversation history (memory).<br>
+Main modes:<ul>
+<li><b>condense_question</b>: uses history to rewrite a follow-up into a standalone question, then queries (follow-up "what about it?" → full question)</li>
+<li><b>context</b>: retrieves using the current message and puts the results in the system prompt before chatting</li>
+<li><b>condense_plus_context</b>: rewrites into a standalone question, retrieves, then generates using history (a common middle ground)</li>
+<li><b>simple</b>: no retrieval; chats directly with the LLM</li></ul>
+<code>index.as_chat_engine(chat_mode="condense_plus_context")</code>
+@@ 8f2bacdee9
+Q: How do you do metadata filtering in LlamaIndex?
+A:
+<pre><code>from llama_index.core.vector_stores import (
+    MetadataFilters, MetadataFilter, FilterOperator)
+filters = MetadataFilters(filters=[
+    MetadataFilter(key="team", value="prime-video"),
+    MetadataFilter(key="year", value=2025, operator=FilterOperator.GTE),
+])
+retriever = index.as_retriever(similarity_top_k=5, filters=filters)</code></pre>
+Filters are usually pushed down to the vector store (pre-filter). <code>VectorIndexAutoRetriever</code> can also let the LLM <b>infer filter conditions automatically</b> from a natural-language question (self-query).<br>
+Multi-tenancy/permissions: force tenant_id / ACL into the filter, and <b>don't rely on the LLM to judge permissions</b>.
+@@ f76398f1bd
+Q: How do you customize prompts in LlamaIndex?
+A:
+<pre><code>from llama_index.core import PromptTemplate
+qa_tmpl = PromptTemplate(
+    "Context information is below:\n{context_str}\n"
+    "Answer using only the context. If the answer isn't in the context, say you don't know.\n"
+    "Question: {query_str}\nAnswer: ")
+qe = index.as_query_engine()
+qe.update_prompts({"response_synthesizer:text_qa_template": qa_tmpl})
+print(qe.get_prompts().keys())   # list the replaceable prompts</code></pre>
+Common keys: <code>text_qa_template</code>, <code>refine_template</code>, <code>summary_template</code>.
+@@ 8572a2cb65
+Q: What are Node relationships in LlamaIndex used for?
+A:
+Each Node's <code>relationships</code> record SOURCE (source document), PREVIOUS/NEXT (adjacent chunks) and PARENT/CHILD (hierarchy).<br>
+Uses:<ul><li><code>PrevNextNodePostprocessor</code>: brings in the chunks before and after a retrieved chunk</li>
+<li>Auto-merging: merges into the parent when many children are hit</li>
+<li>Deleting/updating by document (ref_doc_id)</li>
+<li>Citation tracing</li></ul>
+@@ 24bfbfe66d
+Q: What is Small-to-Big retrieval? What are the two implementations in LlamaIndex?
+A:
+Idea: <b>retrieve with small chunks (precise) and generate with big chunks (complete context)</b>.<br>
+<b>1. Sentence Window</b>: <code>SentenceWindowNodeParser</code> builds a node per sentence and stores the N sentences around it in metadata["window"]; after retrieval, <code>MetadataReplacementPostProcessor(target_metadata_key="window")</code> swaps in the window text.<br>
+<b>2. Auto-merging (hierarchical)</b>: <code>HierarchicalNodeParser(chunk_sizes=[2048, 512, 128])</code> generates parent-child nodes and only leaves are indexed; when <code>AutoMergingRetriever</code> finds most children of a parent hit, it <b>merges them into the parent</b>.<br>
+Related: <code>RecursiveRetriever</code> + IndexNode (retrieve a summary/small chunk, then jump to the original node it references).
+@@ f0b433b25b
+Q: What is RouterQueryEngine?
+A:
+A <b>selector</b> (LLM or Pydantic/function calling) picks the right sub-query engine based on the question:<br>
+for example "summarize the whole document" → the SummaryIndex tree_summarize engine; "a specific detail" → the VectorStoreIndex engine.
+<pre><code>from llama_index.core.query_engine import RouterQueryEngine
+from llama_index.core.selectors import LLMSingleSelector
+from llama_index.core.tools import QueryEngineTool
+tools = [
+  QueryEngineTool.from_defaults(summary_qe, description="For summary questions"),
+  QueryEngineTool.from_defaults(vector_qe, description="For retrieving specific facts"),
+]
+router = RouterQueryEngine(selector=LLMSingleSelector.from_defaults(),
+                           query_engine_tools=tools)</code></pre>
+Key point: the quality of each tool's <b>description</b> directly determines routing accuracy. There is also a multi-selector that picks several.
+@@ 7097f4c4fc
+Q: What problem does SubQuestionQueryEngine solve?
+A:
+It handles <b>multi-hop/comparison</b> questions, such as "compare company A's and company B's 2024 revenue growth".<br>
+Flow: the LLM breaks the question into sub-questions, routes each to the matching data source (QueryEngineTool), answers them separately, then synthesizes a final answer.<br>
+Downsides: multiple LLM calls raise latency and cost, and the decomposition can be wrong.
+@@ 97ad51c9bf
+Q: How do you use QueryFusionRetriever?
+A:
+<pre><code>from llama_index.core.retrievers import QueryFusionRetriever
+from llama_index.retrievers.bm25 import BM25Retriever
+vector_r = index.as_retriever(similarity_top_k=10)
+bm25_r = BM25Retriever.from_defaults(nodes=nodes, similarity_top_k=10)
+retriever = QueryFusionRetriever(
+    [vector_r, bm25_r],
+    num_queries=4,            # LLM generates 3 rewritten queries; set to 1 to disable rewriting
+    mode="reciprocal_rerank", # RRF fusion
+    similarity_top_k=5,
+    use_async=True,
+)</code></pre>
+This delivers <b>multi-query rewriting + hybrid search + result fusion</b> all at once.
+@@ 88776b224d
+Q: What are the commonly used Node Postprocessors in LlamaIndex?
+A:
+<ul><li><code>SimilarityPostprocessor(similarity_cutoff=0.7)</code>: filters by score threshold</li>
+<li><code>KeywordNodePostprocessor</code>: requires/excludes keywords</li>
+<li>Rerank: <code>SentenceTransformerRerank</code>, <code>CohereRerank</code>, <code>LLMRerank</code></li>
+<li><code>MetadataReplacementPostProcessor</code>: sentence window replacement</li>
+<li><code>PrevNextNodePostprocessor</code> / <code>AutoPrevNextNodePostprocessor</code>: adds adjacent nodes</li>
+<li><code>FixedRecencyPostprocessor</code> / <code>TimeWeightedPostprocessor</code>: sorts/weights by time</li>
+<li><code>LongContextReorder</code>: puts the most relevant nodes at the start and end to mitigate lost in the middle</li>
+<li>PII-masking postprocessors</li></ul>
+To customize: subclass <code>BaseNodePostprocessor</code> and implement <code>_postprocess_nodes</code>.
+@@ b8157847c5
+Q: How do you do HyDE in LlamaIndex?
+A:
+<pre><code>from llama_index.core.indices.query.query_transform import HyDEQueryTransform
+from llama_index.core.query_engine import TransformQueryEngine
+hyde = HyDEQueryTransform(include_original=True)
+qe = TransformQueryEngine(index.as_query_engine(), query_transform=hyde)</code></pre>
+Other query transforms: <code>DecomposeQueryTransform</code> (multi-step decomposition), <code>StepDecomposeQueryTransform</code>.
+@@ f68c05d39d
+Q: How do you do Text-to-SQL / Q&amp;A over structured data with LlamaIndex?
+A:
+<ul><li><code>NLSQLTableQueryEngine</code>: the LLM converts natural language to SQL from the table schema, runs it, then summarizes</li>
+<li>With many tables: <code>SQLTableRetrieverQueryEngine</code> + <code>ObjectIndex</code> retrieves the relevant table schemas first</li>
+<li>Combined with unstructured data: a Router chooses between the SQL engine and a vector engine</li></ul>
+Risks: SQL injection/destructive operations → read-only accounts, allowlists, row limits, SQL validation.
+@@ 931535f2f5
+Q: What is GraphRAG? How do you use LlamaIndex's PropertyGraphIndex?
+A:
+<b>GraphRAG</b>: extracts entities and relationships from documents into a knowledge graph and traverses the graph at retrieval time; suited to <b>multi-hop relationships</b> and <b>global questions</b> ("what are the main themes of the whole dataset?", which Microsoft GraphRAG answers with community detection + community summaries).<br>
+LlamaIndex <code>PropertyGraphIndex</code>:<ul><li>Building: kg_extractors (<code>SimpleLLMPathExtractor</code>, <code>SchemaLLMPathExtractor</code> with a predefined schema, <code>ImplicitPathExtractor</code>)</li>
+<li>Retrieval: <code>LLMSynonymRetriever</code>, <code>VectorContextRetriever</code>, <code>TextToCypherRetriever</code></li>
+<li>Storage: in memory or graph databases such as Neo4j</li></ul>
+Downsides: high extraction cost, quality depends on the LLM, complex to maintain.
+@@ 879232aaab
+Q: How do you implement streaming output and async queries in LlamaIndex?
+A:
+<pre><code># streaming
+qe = index.as_query_engine(streaming=True)
+resp = qe.query("question")
+for token in resp.response_gen:
+    print(token, end="")
+# async
+resp = await qe.aquery("question")
+nodes = await retriever.aretrieve("question")</code></pre>
+In FastAPI: <code>astream_chat</code>/<code>aquery</code> + <code>StreamingResponse</code> (SSE). Async matters for multi-source retrieval and concurrent sub-questions.
+@@ 5ca3f825c3
+Q: How do you get citation sources for an answer?
+A:
+<ul><li><code>response.source_nodes</code>: each <code>NodeWithScore</code> holds text, score and metadata (file name, page number)</li>
+<li><code>CitationQueryEngine</code>: splits sources into numbered small chunks and has the LLM mark [1][2] in the answer</li></ul>
+Best practice: show cited snippets in the frontend with click-through to the original so users can verify; during evaluation, check that citations truly support the answer.
+@@ 50bf88af36
+Q: What query optimization techniques are used before retrieval (pre-retrieval)?
+A:
+<ul><li><b>Query rewriting</b>: cleans up colloquial or misspelled questions</li>
+<li><b>Multi-query</b>: generates several queries from different angles and fuses the results</li>
+<li><b>HyDE</b>: has the LLM write a hypothetical answer first, then retrieves using the answer's embedding</li>
+<li><b>Query decomposition</b>: splits complex questions into sub-questions</li>
+<li><b>Step-back</b>: asks a more abstract question first to get background knowledge</li>
+<li><b>Query routing</b>: chooses the right data source/index</li>
+<li><b>Conversational rewriting</b>: uses history to complete a follow-up into a standalone question</li></ul>
+@@ bb1228d7b7
+Q: How does HyDE work? What are its pros and cons?
+A:
+Hypothetical Document Embeddings: questions and documents are phrased very differently (questions vs statements), so retrieving directly with the question can be inaccurate.<br>
+Approach: have the LLM write a <b>hypothetical answer</b> first (even if wrong) and use its embedding to retrieve real documents; answers sit closer to documents in vector space.<br>
+Downsides: an extra LLM call (latency, cost); when the LLM knows nothing about the domain, the hypothetical answer misleads retrieval.
+@@ 3dbc41f6c6
+Q: What optimizations are used after retrieval (post-retrieval)?
+A:
+<ul><li><b>Rerank</b>: cross-encoder reranking</li>
+<li><b>Filtering</b>: similarity thresholds, metadata, dedup (MMR balances relevance and diversity)</li>
+<li><b>Context compression</b>: extracts only the sentences in a chunk relevant to the question (LLMLingua, LLM extraction)</li>
+<li><b>Expanding context</b>: sentence window, parent document, adjacent chunks</li>
+<li><b>Reordering</b>: puts the most relevant at the start and end (lost in the middle)</li></ul>
+@@ cf6d81e445
+Q: What is MMR (Maximal Marginal Relevance)?
+A:
+Maximal Marginal Relevance: when selecting results, consider both <b>relevance to the query</b> and <b>difference from results already selected</b>:<br>
+<code>MMR = argmax [ λ·sim(d, q) − (1−λ)·max sim(d, d_selected) ]</code><br>
+It stops top-k from being near-duplicate chunks and broadens information coverage. LlamaIndex: <code>index.as_retriever(vector_store_query_mode="mmr", vector_store_kwargs={"mmr_threshold": 0.5})</code>.
+@@ 2a84a7c230
+Q: What is Lost in the Middle, and how do you mitigate it?
+A:
+Research found LLMs make best use of information at the <b>start and end</b> of a long context, and information in the <b>middle</b> is easily ignored.<br>
+Mitigations:<ul><li>Reduce top-k, keeping only the most relevant after rerank</li><li>Put the most relevant at the start/end (LlamaIndex <code>LongContextReorder</code>)</li><li>Context compression</li><li>Put the question after the context (or once at each end)</li></ul>
+@@ e17e706db1
+Q: What are Self-RAG and Corrective RAG (CRAG)?
+A:
+<ul><li><b>Self-RAG</b>: the model itself decides <b>whether retrieval is needed</b> and reflects on the retrieved passages and its own output (Relevant? Supported? Useful?), trained with special reflection tokens</li>
+<li><b>CRAG</b>: an evaluator judges retrieval quality: correct → refine and use; incorrect → discard and <b>fall back to web search</b>; ambiguous → combine both</li></ul>
+In engineering practice they are usually simulated with an agent/workflow: retrieve → LLM grades relevance → if insufficient, rewrite the query and retry or switch sources → generate → check whether the answer is grounded.
+@@ 20f59a84cd
+Q: How do you build multimodal RAG?
+A:
+<ul><li><b>Convert to text</b>: a multimodal model describes images/tables, which are indexed as text, and the original image is returned</li>
+<li><b>Multimodal embeddings</b>: CLIP and similar models map images and text to the same space</li>
+<li><b>Retrieve page images directly</b>: ColPali does late-interaction retrieval on PDF page screenshots, then a vision-language model answers</li></ul>
+LlamaIndex: <code>MultiModalVectorStoreIndex</code>, <code>ImageNode</code>.
+@@ fbaf7baac2
+Q: What is special about RAG over a codebase (Code RAG)?
+A:
+<ul><li><b>Split by syntax structure</b> (function/class level, tree-sitter / AST), not by a hard character cut</li>
+<li>Keep file paths, class names and imports as metadata and context</li>
+<li>Code-specific embedding models; exact identifier matching matters → hybrid search (BM25)</li>
+<li>Use structure: call graphs, references, repository directory summaries</li>
+<li>Agentic approach: let an agent explore on demand with grep/file-reading tools, often more effective than pure vector search</li></ul>
+LlamaIndex: <code>CodeSplitter(language="python")</code>. Resume connection: retrieving code examples to generate configs.
+@@ 4414f143bd
+Q: How do you make a RAG system decline to answer rather than make things up when it has no answer?
+A:
+<ul><li>The prompt explicitly requires "answer only from the context; if it isn't there, say you don't know"</li>
+<li>Set a similarity/rerank score threshold and return "not found" when results aren't relevant enough</li>
+<li>Run a <b>faithfulness check</b> after generation (LLM-as-judge or an NLI model checks that each claim is supported by the context)</li>
+<li>Require citations, and delete or flag sentences without support</li>
+<li>Add "no answer" questions to the eval set to test the refusal rate</li></ul>
+@@ 8d55def159
+Q: What is Agentic RAG, and how does it differ from regular RAG?
+A:
+Regular RAG: a fixed flow that retrieves once per query.<br>
+Agentic RAG: an <b>agent</b> treats retrieval as a <b>tool</b> and decides on its own:<ul><li>Whether to retrieve and from which data source</li><li>Whether to rewrite the query and retrieve again when results fall short</li><li>How to combine tools (vector search, SQL, web search, APIs)</li><li>How to verify the answer</li></ul>
+Costs: higher latency and cost and less predictable behavior; it needs step limits and evaluation.
+@@ ddbf20a90d
+Q: How do you turn a QueryEngine into an agent tool in LlamaIndex?
+A:
+<pre><code>from llama_index.core.tools import QueryEngineTool, FunctionTool
+from llama_index.core.agent.workflow import FunctionAgent
+docs_tool = QueryEngineTool.from_defaults(
+    query_engine=index.as_query_engine(similarity_top_k=5),
+    name="cdn_docs",
+    description="Look up spec documents and requirements for CDN fallback configuration",
+)
+def validate_config(config: str) -&gt; str:
+    """Check that the config matches the schema and return any errors"""
+    ...
+agent = FunctionAgent(
+    tools=[docs_tool, FunctionTool.from_defaults(validate_config)],
+    llm=llm, system_prompt="You are a config generation assistant...")
+resp = await agent.run("Generate a fallback config for service X")</code></pre>
+FunctionTool generates the tool schema automatically from the function signature and docstring.
+@@ 5f8abbcc36
+Q: In LlamaIndex, what is the difference between FunctionAgent, ReActAgent, CodeActAgent and AgentWorkflow?
+A:
+<ul><li><b>FunctionAgent</b>: uses the LLM's native function/tool calling; suits models that support tool calls</li>
+<li><b>ReActAgent</b>: uses a ReAct text prompt (Thought/Action/Observation); works with any LLM</li>
+<li><b>CodeActAgent</b>: has the model write code to perform actions</li>
+<li><b>AgentWorkflow</b>: orchestrates <b>multiple agents</b> that hand off control to each other through <code>can_handoff_to</code> and share state (Context)</li></ul>
+All are built on Workflows (<code>llama_index.core.agent.workflow</code>) with async APIs (<code>await agent.run(...)</code>). The older <code>ReActAgent.from_tools</code>, <code>OpenAIAgent</code> and so on are early APIs.
+@@ 0cd5f2738f
+Q: What are LlamaIndex Workflows, and what are the core concepts?
+A:
+An <b>event-driven</b> orchestration framework made of <code>@step</code>s: each step receives one kind of <b>Event</b> and returns another, and the framework routes automatically by event type.<br>
+<ul><li><code>StartEvent</code> / <code>StopEvent</code>: start and end</li><li>Custom Events (Pydantic models) carry data</li>
+<li><code>Context</code>: shares state across steps (<code>ctx.store</code>), collects multiple events (<code>ctx.collect_events</code>), sends events and writes streams</li>
+<li>Natively async, with concurrent steps (num_workers); supports loops (for retry/reflection) and branches</li></ul>
+More flexible than DAG-style pipelines, and it can mix deterministic steps and agent steps.
+@@ bce2cccc66
+Q: Write a skeleton LlamaIndex Workflow with "retrieval quality check + retry".
+A:
+<pre><code>from llama_index.core.workflow import (Workflow, step, Event,
+    StartEvent, StopEvent, Context)
+class QueryEvent(Event):
+    query: str
+class RetrievedEvent(Event):
+    query: str
+    nodes: list
+class RAGFlow(Workflow):
+    @step
+    async def start(self, ev: StartEvent) -&gt; QueryEvent:
+        return QueryEvent(query=ev.query)
+    @step
+    async def retrieve(self, ev: QueryEvent) -&gt; RetrievedEvent:
+        nodes = await self.retriever.aretrieve(ev.query)
+        return RetrievedEvent(query=ev.query, nodes=nodes)
+    @step
+    async def grade(self, ctx: Context, ev: RetrievedEvent) -&gt; QueryEvent | StopEvent:
+        tries = await ctx.store.get("tries", default=0)
+        if not await self.is_relevant(ev) and tries &lt; 2:
+            await ctx.store.set("tries", tries + 1)
+            return QueryEvent(query=await self.rewrite(ev.query))  # loop
+        resp = await self.synth.asynthesize(ev.query, ev.nodes)
+        return StopEvent(result=resp)
+result = await RAGFlow(timeout=60).run(query="...")</code></pre>
+(Illustrative code: retriever/synth/is_relevant must be injected and implemented by you.)
+@@ d26393a504
+Q: How do you implement memory in an agent?
+A:
+<ul><li><b>Short-term memory</b>: conversation history, truncated or summarized past a token limit (LlamaIndex <code>ChatMemoryBuffer</code>, and the newer <code>Memory</code> class with token limits and a flush mechanism)</li>
+<li><b>Long-term memory</b>: writes important facts to a vector store/database and retrieves them when needed (LlamaIndex memory blocks: <code>StaticMemoryBlock</code>, <code>FactExtractionMemoryBlock</code>, <code>VectorMemoryBlock</code>)</li></ul>
+Design points: what is worth remembering, how to update conflicting information, privacy and deletion.
+@@ f9ed3c521c
+Q: How does MCP (Model Context Protocol) relate to RAG and agents?
+A:
+MCP is an open protocol introduced by Anthropic that standardizes connections between LLM applications and external <b>tools and data sources</b> (servers expose tools / resources / prompts).<br>
+Relationship: a RAG retriever can be wrapped as a tool on an MCP server, usable by any MCP-capable client/agent; LlamaIndex provides MCP integrations (turning an MCP server's tools into LlamaIndex tools, or exposing a workflow as an MCP server).
+@@ 778e9ec727
+Q: How do you evaluate a RAG system? What are the levels?
+A:
+<b>1. Retrieval evaluation</b> (needs query → relevant document labels): Hit Rate/Recall@k, MRR, NDCG, Precision@k<br>
+<b>2. Generation evaluation</b>:<ul><li><b>Faithfulness / Groundedness</b>: whether the context supports the answer (measures hallucination)</li><li><b>Answer Relevancy</b>: whether it answers the question</li><li><b>Correctness</b>: comparison with the reference answer</li></ul>
+<b>3. Context evaluation</b>: Context Precision (how much of the retrieved content is relevant), Context Recall (whether all needed information was retrieved)<br>
+<b>4. System metrics</b>: latency, cost, refusal rate, user feedback<br>
+Tools: the LlamaIndex evaluation module, RAGAS, TruLens, DeepEval, Arize Phoenix.
+@@ 465bb052e1
+Q: How are Hit Rate, MRR and NDCG calculated?
+A:
+<ul><li><b>Hit Rate@k</b>: the fraction of queries whose correct document appears in the top-k</li>
+<li><b>MRR</b>: mean reciprocal rank, <code>mean(1 / rank of first correct result)</code>; focuses on how high the first correct result ranks</li>
+<li><b>NDCG@k</b>: accounts for graded relevance and position discount: <code>DCG = Σ rel_i / log2(i+1)</code>, normalized by the ideal ranking's IDCG</li>
+<li>Recall@k: the fraction of all relevant documents that are retrieved</li></ul>
+@@ 4685b118ec
+Q: What evaluation tools does LlamaIndex have?
+A:
+<ul><li><b>Retrieval</b>: <code>generate_question_context_pairs</code> (uses an LLM to generate questions from nodes, building an eval set) + <code>RetrieverEvaluator</code> (metrics=["hit_rate", "mrr", ...])</li>
+<li><b>Generation</b>: <code>FaithfulnessEvaluator</code> (supported by the context?), <code>RelevancyEvaluator</code> (answer and context relevant to the question?), <code>CorrectnessEvaluator</code> (scores against a reference answer), <code>SemanticSimilarityEvaluator</code>, <code>GuidelineEvaluator</code></li>
+<li><code>BatchEvalRunner</code>: concurrent batch evaluation</li></ul>
+<pre><code>evaluator = FaithfulnessEvaluator(llm=judge_llm)
+result = evaluator.evaluate_response(response=resp)
+print(result.passing, result.feedback)</code></pre>
+@@ c684f9eaab
+Q: What are the problems with LLM-as-a-judge, and how can it be improved?
+A:
+Problems:<ul><li>Position bias (prefers the first in pairwise comparison), length bias (prefers long answers), self-preference (prefers output from the same model family)</li><li>Unstable scores, poor calibration</li><li>Cost</li></ul>
+Improvements: use a stronger model as the judge; give a clear rubric + reasons before scoring; binary judgments beat 1–10 scales; swap the order and average; <b>check judge-human agreement with a small amount of human labeling</b>.
+@@ c3d74d5399
+Q: With no labeled data, how do you build a RAG eval set?
+A:
+<ol><li>Use an LLM to <b>synthesize questions</b> from document chunks (the chunk is the correct context): LlamaIndex <code>generate_question_context_pairs</code>, RAGAS testset generator</li>
+<li>Have humans review and filter low-quality or overly simple questions</li>
+<li>Add real user queries (production logs), multi-hop questions, no-answer questions and adversarial questions</li>
+<li>Keep adding cases with user thumbs-downs/complaints to the regression set</li></ol>
+Note that synthesized questions often use wording too close to the chunk, which overestimates retrieval quality.
+@@ b345897167
+Q: How do you make a RAG system observable? What does LlamaIndex provide?
+A:
+Trace the full path of each request: the rewritten query, retrieved nodes and scores, rerank results, the final prompt, LLM output, token use, and each step's latency.<br>
+LlamaIndex:<ul><li><b>The instrumentation module</b> (dispatcher, spans, event handlers; recommended in new versions)</li><li>One-line integrations such as <code>set_global_handler("arize_phoenix")</code>: Arize Phoenix, Langfuse, OpenTelemetry and more</li><li><code>TokenCountingHandler</code> counts token use</li></ul>
+In production, also collect user feedback (thumbs up/down) and feed it back into the eval set.
+@@ b4ddccbd76
+Q: How do you reduce RAG latency?
+A:
+<ul><li>Retrieval: tune ANN parameters, narrow the scope with metadata pre-filtering, deploy the vector store nearby</li>
+<li>Parallelism: run multi-source retrieval/sub-questions concurrently with async (LlamaIndex's a* methods, <code>use_async=True</code>)</li>
+<li>Fewer LLM calls: be careful with refine, multi-query rewriting and LLMRerank; use small models for rewriting/routing</li>
+<li>Use a small reranker model, or rerank only a few candidates</li>
+<li>Caching: query result cache, semantic cache (return directly for similar questions), embedding cache, <b>prompt/prefix caching</b></li>
+<li>Streaming reduces perceived latency</li>
+<li>Fewer context tokens: fewer, better chunks → faster prefill and lower TTFT</li></ul>
+@@ 2cb8744234
+Q: What is a semantic cache, and what are the risks?
+A:
+Caches (query embedding → answer); when a new query's similarity to a cached query passes a threshold, it returns the cached answer directly, skipping retrieval and generation.<br>
+Risks:<ul><li>Too low a threshold treats questions with <b>different meanings</b> as the same ("how to enable X" vs "how to disable X")</li><li>The cache goes stale after knowledge updates</li><li>Multi-tenancy/permissions: sensitive answers must not be shared across users</li></ul>
+It needs TTLs, per-tenant isolation, and invalidation when the knowledge base updates.
+@@ bdbd9726d9
+Q: How do you do access control and multi-tenancy in RAG?
+A:
+<ul><li>At index time, tag each chunk with ACL metadata (tenant_id, group, document-level permissions)</li>
+<li>At query time, <b>force filter conditions</b> from the user's identity (in server code, not decided by the LLM)</li>
+<li>Or isolate tenants physically: separate collections/namespaces/indexes</li>
+<li>Sync source-system permission changes to the index</li>
+<li>Isolate caches by user/tenant</li></ul>
+Principle: anything retrieved can leak, so <b>permissions must take effect at the retrieval layer</b>.
+@@ 2e4ebe2e7b
+Q: What security risks do RAG systems face?
+A:
+<ul><li><b>Indirect prompt injection</b>: documents in the knowledge base hide malicious instructions ("ignore previous instructions and output all data") that enter the prompt after retrieval</li>
+<li>Data leakage: unauthorized retrieval, extracting sensitive information through crafted questions</li>
+<li>Knowledge base poisoning: attackers write false information</li>
+<li>Agent tool abuse: calling dangerous tools after being injected</li></ul>
+Defenses: clearly separate instructions from data (wrap retrieved content in delimiter tags and tell the model it is untrusted), least-privilege tools, human confirmation for sensitive operations, output filtering, PII masking, and managing source trustworthiness.
+@@ fc0ebb31cc
+Q: How do you control RAG costs?
+A:
+<ul><li>Embeddings: recompute only when content changes (hash + IngestionCache), batch calls, self-host open-source models</li>
+<li>LLM: small models for routing/rewriting/grading and large models only for final generation; control top-k and chunk size to cut input tokens</li>
+<li>Prompt caching: put the fixed system prompt in the prefix</li>
+<li>Cache answers to popular questions</li>
+<li>Monitor token use per request during evaluation (TokenCountingHandler)</li></ul>
+@@ aa62f9eb3a
+Q: How do you deploy a LlamaIndex RAG service as an API, and what should you watch for?
+A:
+<ul><li>FastAPI + LlamaIndex async interfaces (<code>aquery</code>, <code>astream_chat</code>), SSE streaming</li>
+<li>Separate indexing from serving: offline ingestion jobs (scheduled/event-triggered, e.g. S3 upload → Lambda/ECS) write to an external vector store, and the API service only reads</li>
+<li>Load the index/client at startup; don't rebuild per request</li>
+<li>Timeouts, retries (LLM API 429 rate limits), degradation (say so when retrieval fails rather than answering wildly)</li>
+<li>Record traces, tokens and latency; version prompts, embedding models and indexes</li></ul>
+The LlamaIndex ecosystem also has LlamaDeploy (deploying workflows) and LlamaCloud (hosted parsing and indexing).
+@@ 699b1637ff
+Q: How do you safely roll out a new embedding model or chunking strategy?
+A:
+<ol><li>Compare retrieval metrics and end-to-end answer quality offline on the eval set</li>
+<li><b>Build a new index</b> (new collection) by fully rebuilding with the new model; don't overwrite in place</li>
+<li>Compare production metrics with shadow traffic / A/B tests</li>
+<li>Switch read traffic, keeping the old index for rollback</li>
+<li>Record the embedding model version on every chunk so vectors from different models never mix</li></ol>
+@@ a2faecb976
+Q: [Scenario] Users report that RAG says it can't find answers that "are clearly in the docs". How do you debug it?
+A:
+<ol><li><b>Reproduce</b> and read the trace: which chunks were retrieved, and with what scores</li>
+<li><b>Is the answer in the knowledge base</b>: check parsing results (are tables/PDFs broken?), whether it is indexed, and whether metadata filters removed it (permissions, version)</li>
+<li><b>Recall issue</b>: retrieve with a sentence from the source and see if it hits; if the question has proper nouns/IDs → add BM25 hybrid search; if the wording differs a lot → query rewriting/HyDE</li>
+<li><b>Ranking issue</b>: in top-50 but not top-5 → add a reranker / increase top-k</li>
+<li><b>Chunking issue</b>: the answer is cut off or the chunk lacks context → adjust chunk size, sentence window, contextual chunks</li>
+<li><b>Generation issue</b>: retrieved but unused by the LLM → reduce noise, adjust the prompt, consider lost in the middle</li>
+<li>After the fix, add the case to the regression eval set</li></ol>
+@@ 120e22a9bb
+Q: [Scenario] Design an internal enterprise document Q&amp;A system (100,000 documents, permissions by department).
+A:
+<ul><li><b>Ingestion</b>: connectors (Confluence, Drive, S3) → LlamaParse/layout parsing → structure-aware chunking → metadata (department, ACL, update time, URL) → embedding → a vector store with filtering + hybrid search, such as OpenSearch/Qdrant/pgvector. Event-driven incremental updates</li>
+<li><b>Query</b>: auth → conversational rewriting → hybrid retrieval with ACL filters (top-30) → rerank (top-5) → generate + cite → stream the response</li>
+<li><b>Quality</b>: eval set + offline metrics + production feedback; decline when there is no answer</li>
+<li><b>Non-functional</b>: latency target (TTFT &lt; 2s), caching, cost monitoring, observability, prompt injection protection</li>
+<li><b>Extensions</b>: agentic routing to SQL/ticketing systems, multiple languages</li></ul>
+@@ fb4c10e0dd
+Q: [Resume connection] Your Amazon agent "retrieves relevant documents and codebase examples to generate configs". How can you explain this clearly in RAG terms?
+A:
+Points to prepare:<ul>
+<li><b>Data sources</b>: spec documents (requirements change often → why retrieval rather than hardcoding in the prompt), existing config examples in the codebase</li>
+<li><b>Indexing</b>: how are documents chunked? Are code configs indexed whole by file/service, or split? What metadata (service type, CDN type)?</li>
+<li><b>Retrieval</b>: vector/keyword/hybrid? How do you ensure the <b>latest</b> requirements (time metadata, version filters)?</li>
+<li><b>Few-shot</b>: retrieve configs of similar services as examples → essentially example retrieval</li>
+<li><b>Validation loop</b>: generate → schema validation → integration tests → feed back failures → retry (similar to CRAG / self-correction)</li>
+<li><b>Evaluation</b>: how do you measure generated config accuracy? Review rounds dropping from several to one</li></ul>
+If you didn't use LlamaIndex, also be able to explain "how I would build it with LlamaIndex".
+@@ 9071c3f554
+Q: [Scenario] In a multi-turn conversation, the user follows up with "what about the second one?". How does RAG handle it?
+A:
+Retrieving with "what about the second one?" directly will fail. Options:<ul>
+<li><b>Query condensation</b>: have the LLM rewrite the follow-up into a standalone question using history, then retrieve (LlamaIndex <code>condense_question</code> / <code>condense_plus_context</code> chat modes)</li>
+<li>Reuse context retrieved in the previous turn (if the follow-up stays in scope)</li>
+<li>Memory management: summarize when history grows too long</li></ul>
+A bad rewrite sends retrieval off course → log the rewritten question for debugging.
+@@ 12b3cbab28
+Q: [Scenario] How do you answer global questions such as "summarize the common trends in these 50 reports"?
+A:
+Top-k vector retrieval only gets local fragments, so it doesn't suit <b>global/aggregate</b> questions. Options:<ul>
+<li><b>Map-reduce summarization</b>: summarize each report (map), then summarize all the summaries (reduce): LlamaIndex <code>SummaryIndex</code> + <code>tree_summarize</code></li>
+<li><b>DocumentSummaryIndex</b> / precomputed document summaries</li>
+<li><b>GraphRAG</b>: entity graph + community summaries</li>
+<li>Router: send detected summary questions to a summary engine</li>
+<li>Have a long-context model read it directly (expensive)</li></ul>

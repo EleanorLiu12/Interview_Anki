@@ -1,0 +1,1083 @@
+@@ 8cef4a4d7a
+Q: What is the difference between <code>is</code> and <code>==</code> in Python?
+A:
+<ul><li><code>is</code> compares <b>identity</b> (whether both names point to the same object, i.e. the same <code>id()</code>)</li>
+<li><code>==</code> compares <b>value</b> by calling <code>__eq__</code></li></ul>
+<pre><code>a = [1,2]; b = [1,2]
+a == b  # True
+a is b  # False</code></pre>
+Gotcha: small integers in [-5, 256] and some strings are cached/interned, so <code>is</code> can "happen" to be True. Use <code>is None</code> to check for None.
+@@ 798bd208f4
+Q: Mutable vs immutable objects? Give examples of each.
+A:
+<b>Immutable</b>: int, float, bool, str, tuple, frozenset, bytes. A "modification" creates a new object.<br>
+<b>Mutable</b>: list, dict, set, bytearray, instances of custom classes.<br>
+Consequences:<ul><li>Only hashable (usually immutable) objects can be dict keys or set elements</li>
+<li>When a function mutates a mutable argument, the caller sees the change</li>
+<li>A tuple itself is immutable, but a list inside it can still be changed (and such a tuple is not hashable)</li></ul>
+@@ 7ffa007628
+Q: Does Python pass arguments by value or by reference?
+A:
+Neither. It is called <b>call by object reference (call by sharing)</b>.<br>
+The function receives a copy of the reference to the object:<ul>
+<li>Mutating a mutable object in place (<code>lst.append</code>) → visible to the caller</li>
+<li>Rebinding the parameter (<code>lst = [...]</code>) → the caller is unaffected</li></ul>
+@@ 557a1832a9
+Q: Why shouldn't you use a mutable object as a default argument?
+A:
+Default arguments are <b>evaluated only once, when the function is defined</b>, so every call shares the same object.
+<pre><code>def f(x, acc=[]):
+    acc.append(x); return acc
+f(1)  # [1]
+f(2)  # [1, 2]  ← gotcha
+# Correct version
+def f(x, acc=None):
+    if acc is None: acc = []
+    acc.append(x); return acc</code></pre>
+@@ eaba663a14
+Q: What is the difference between a shallow copy and a deep copy?
+A:
+<ul><li><b>Assignment</b>: only adds another reference</li>
+<li><b>Shallow copy</b> (<code>copy.copy</code>, <code>lst[:]</code>, <code>list(lst)</code>, <code>dict.copy()</code>): creates a new outer container whose elements still reference the original objects</li>
+<li><b>Deep copy</b> (<code>copy.deepcopy</code>): recursively copies all sub-objects, using a memo dict to handle circular references</li></ul>
+<pre><code>a = [[1], 2]; b = copy.copy(a)
+b[0].append(9)  # a also becomes [[1, 9], 2]</code></pre>
+@@ 9a8693e6e3
+Q: How are list, tuple, set and dict implemented, and what are the complexities of common operations?
+A:
+<ul><li><b>list</b>: dynamic array of pointers. Index O(1), append amortized O(1), insert/pop(0)/in O(n)</li>
+<li><b>tuple</b>: fixed-length array, immutable, hashable (if its elements are hashable)</li>
+<li><b>dict</b>: hash table with open addressing; insertion order is guaranteed since 3.7 (compact dict: index array + entries array). Lookup/insert/delete average O(1), worst case O(n)</li>
+<li><b>set</b>: hash table, <code>in</code> is average O(1)</li></ul>
+Use <code>collections.deque</code> for operations at both ends (O(1)).
+@@ 42dc65a50b
+Q: How does a Python dict resolve hash collisions, and how does it resize?
+A:
+CPython uses <b>open addressing</b> (not chaining). On a collision, it follows a pseudo-random probe sequence perturbed by the high bits of the hash to find the next slot.<br>
+It resizes and rehashes when the load factor exceeds about <b>2/3</b>. Deleted entries are marked with a "tombstone" (dummy) so probe chains stay intact.<br>
+Since 3.6 it uses a compact layout: a small sparse indices array + an entries array in insertion order → less memory, and ordered.
+@@ 2981e07808
+Q: What does hashable mean? How do you make a custom class hashable?
+A:
+An object's hash stays constant during its lifetime, and it implements <code>__hash__</code> and <code>__eq__</code>; <b>a == b must imply hash(a) == hash(b)</b>.<br>
+<ul><li>Instances of a default class hash by id, so they are hashable</li>
+<li>If you override <code>__eq__</code> without <code>__hash__</code>, <code>__hash__</code> is set to None → not hashable</li>
+<li><code>@dataclass(frozen=True)</code> generates <code>__hash__</code> automatically</li></ul>
+@@ 2d6565ad9e
+Q: What is a decorator? Write a timing decorator by hand.
+A:
+A decorator is a higher-order function that takes a function and returns a new one; <code>@deco</code> is equivalent to <code>f = deco(f)</code>.
+<pre><code>import functools, time
+def timer(func):
+    @functools.wraps(func)  # preserve __name__/__doc__
+    def wrapper(*args, **kwargs):
+        t = time.perf_counter()
+        try:
+            return func(*args, **kwargs)
+        finally:
+            print(func.__name__, time.perf_counter() - t)
+    return wrapper</code></pre>
+@@ 762d0c0db1
+Q: How do you write a decorator that takes arguments (e.g. @retry(times=3))?
+A:
+Use three levels of nesting: the outermost takes the arguments and returns the actual decorator.
+<pre><code>def retry(times=3, exc=Exception):
+    def deco(func):
+        @functools.wraps(func)
+        def wrapper(*a, **kw):
+            for i in range(times):
+                try:
+                    return func(*a, **kw)
+                except exc:
+                    if i == times - 1: raise
+        return wrapper
+    return deco</code></pre>
+When stacking decorators, <b>they are applied bottom-up and run top-down</b>.
+@@ 35941d4ed6
+Q: Why use functools.wraps in a decorator?
+A:
+Without it, the decorated function's <code>__name__</code>, <code>__doc__</code>, <code>__module__</code>, <code>__qualname__</code> and so on become the wrapper's, which hurts debugging, logging, docs, and frameworks that rely on the function name or signature (such as FastAPI routes and pytest).<br>
+<code>wraps</code> copies these attributes and sets <code>__wrapped__</code> to the original function (which <code>inspect.signature</code> uses).
+@@ 38ba101472
+Q: Iterator vs iterable vs generator?
+A:
+<ul><li><b>Iterable</b>: implements <code>__iter__</code> (returns an iterator), e.g. list, dict</li>
+<li><b>Iterator</b>: implements <code>__iter__</code> (returns itself) + <code>__next__</code>, raises <code>StopIteration</code> when exhausted; can only be traversed once</li>
+<li><b>Generator</b>: an iterator created by a function using <code>yield</code> or by a generator expression; it saves its frame state automatically, is <b>lazily evaluated</b>, and saves memory</li></ul>
+What a <code>for</code> loop really does: <code>it = iter(obj)</code>, then repeat <code>next(it)</code> until StopIteration.
+@@ e5d7dddb62
+Q: What is the difference between yield and return? What does yield from do?
+A:
+<code>yield</code> produces a value and <b>suspends</b> the function; the next <code>next()</code> resumes from there. <code>return</code> ends the function (in a generator, the returned value goes into StopIteration.value).<br>
+<code>yield from sub</code>: delegates to a sub-generator, automatically forwards next/send/throw, and receives the sub-generator's return value.
+<pre><code>def flatten(x):
+    for i in x:
+        if isinstance(i, list): yield from flatten(i)
+        else: yield i</code></pre>
+Generators also support <code>send(v)</code> (passes a value into the yield expression), <code>throw()</code> and <code>close()</code>.
+@@ 668c6e5d87
+Q: List comprehension vs generator expression?
+A:
+<code>[x*x for x in data]</code> builds the whole list immediately, using O(n) memory;<br>
+<code>(x*x for x in data)</code> produces values lazily with O(1) memory and can only be traversed once.<br>
+Use generators for large data or streaming; use lists when you need repeated access, slicing or len. In <code>sum(x*x for x in data)</code> the extra parentheses can be omitted.
+@@ 1d7f0be52a
+Q: What is a context manager, and how do you implement one?
+A:
+Used with the <code>with</code> statement to guarantee resources are acquired and released (files, locks, connections, transactions).<br>
+<b>Class-based</b>: <code>__enter__</code> / <code>__exit__(exc_type, exc, tb)</code>; if <code>__exit__</code> returns True, the exception is swallowed.<br>
+<b>Function-based</b>:
+<pre><code>from contextlib import contextmanager
+@contextmanager
+def timer():
+    t = time.time()
+    try:
+        yield
+    finally:
+        print(time.time() - t)</code></pre>
+Async versions: <code>__aenter__/__aexit__</code>, <code>@asynccontextmanager</code>.
+@@ b8c03eeae2
+Q: What is a closure? What does nonlocal do?
+A:
+An inner function references a local variable of its outer function and can still access it after the outer function returns. These variables live in the cells of <code>__closure__</code>.
+<pre><code>def counter():
+    n = 0
+    def inc():
+        nonlocal n   # otherwise n += 1 raises UnboundLocalError
+        n += 1; return n
+    return inc</code></pre>
+Classic gotcha: lambdas created in a loop capture the variable through <b>late binding</b>, so they all see the final value: <code>[lambda: i for i in range(3)]</code> all return 2. Fix it with <code>lambda i=i: i</code>.
+@@ 77ab5c735b
+Q: What are Python's variable scope rules (LEGB)?
+A:
+Lookup order: <b>L</b>ocal → <b>E</b>nclosing (outer function) → <b>G</b>lobal (module) → <b>B</b>uilt-in.<br>
+Assignment creates a local variable by default; use <code>global</code> to modify a global and <code>nonlocal</code> to modify an outer function's variable.<br>
+Note: list comprehensions have their own scope; <code>if/for</code> blocks do not.
+@@ 866fca936c
+Q: What are *args and **kwargs? And what do / and * mean in a parameter list?
+A:
+<code>*args</code> collects extra positional arguments into a tuple; <code>**kwargs</code> collects extra keyword arguments into a dict.<br>
+<pre><code>def f(a, b, /, c, *, d): ...
+# a,b are positional-only; c can be either; d is keyword-only</code></pre>
+At a call site, <code>f(*lst, **dct)</code> is unpacking.
+@@ afe579b306
+Q: How do Python's memory management and garbage collection work?
+A:
+<b>1. Reference counting</b> (primary): each object has an ob_refcnt and is freed as soon as it reaches 0. Pro: immediate. Cons: cannot handle reference cycles, and has maintenance overhead.<br>
+<b>2. Mark-and-sweep / cycle GC</b> (the <code>gc</code> module): tracks only container objects, finds unreachable reference cycles and reclaims them.<br>
+<b>3. Generational collection</b>: objects are grouped by age and younger generations are scanned more often (based on the assumption that most objects die young).<br>
+There is also <b>pymalloc</b>, a memory pool for small objects (≤512B) that reduces malloc overhead.<br>
+Use <code>weakref</code> to avoid reference cycles and <code>sys.getrefcount</code> to inspect a count.
+@@ 264acbb533
+Q: What is the difference between <code>__new__</code> and <code>__init__</code>?
+A:
+<ul><li><code>__new__(cls, ...)</code>: a static method that <b>creates and returns the instance</b>; called first</li>
+<li><code>__init__(self, ...)</code>: <b>initializes</b> the already-created instance; returns None</li></ul>
+If <code>__new__</code> returns something that is not an instance of cls, <code>__init__</code> is not called.<br>
+Uses: singletons, customizing creation when subclassing immutable types (int/str/tuple), metaclasses.
+@@ 3dc3d2a7a1
+Q: What are the ways to implement a singleton in Python?
+A:
+<ol><li><b>Module</b>: a module is naturally imported only once (the most Pythonic)</li>
+<li><b>__new__</b>:
+<pre><code>class S:
+    _inst = None
+    def __new__(cls, *a, **k):
+        if cls._inst is None:
+            cls._inst = super().__new__(cls)
+        return cls._inst</code></pre></li>
+<li><b>Decorator</b>: cache the instance in a dict</li>
+<li><b>Metaclass</b>: override <code>__call__</code></li></ol>
+With multiple threads you need a lock (double-checked locking).
+@@ 7fbaa3e027
+Q: What is the difference between an instance method, @classmethod and @staticmethod?
+A:
+<ul><li><b>Instance method</b>: first parameter is self; accesses instance state</li>
+<li><b>classmethod</b>: first parameter is cls; often used as an <b>alternative constructor</b> (<code>from_json</code>), and cls is the subclass when called from a subclass</li>
+<li><b>staticmethod</b>: no implicit parameter; just a plain function placed in the class namespace</li></ul>
+@@ 93aa8ef7cf
+Q: What is the MRO, and how does super() work?
+A:
+The MRO (method resolution order) is computed by the <b>C3 linearization</b> algorithm, which guarantees: subclasses come before parents, multiple parents keep their declared order, and the ordering is monotonic. Inspect it with <code>Cls.__mro__</code>.<br>
+<code>super()</code> does not mean "call the parent"; it <b>calls the method on the next class in the MRO</b>. In diamond inheritance, cooperative <code>super().__init__()</code> calls initialize each class exactly once.
+@@ 7ab4d30ef9
+Q: What does @property do? What is a descriptor?
+A:
+<code>@property</code> turns a method into attribute access, and you can add a setter/deleter for validation or lazy computation while keeping the caller's interface unchanged.<br>
+<b>Descriptor</b>: a class attribute that implements <code>__get__</code>/<code>__set__</code>/<code>__delete__</code>. property, classmethod, staticmethod, and functions binding into methods are all built on the descriptor protocol.<br>
+Data descriptors (with __set__) take priority over the instance __dict__; non-data descriptors rank below it.
+@@ 8512494174
+Q: What are the commonly used magic methods?
+A:
+<ul><li>Construction: <code>__new__ __init__ __del__</code></li>
+<li>Representation: <code>__repr__</code> (for developers, ideally eval-able), <code>__str__</code> (for users)</li>
+<li>Comparison/hashing: <code>__eq__ __lt__ __hash__</code> (together with <code>functools.total_ordering</code>)</li>
+<li>Containers: <code>__len__ __getitem__ __setitem__ __contains__ __iter__</code></li>
+<li>Calling: <code>__call__</code>; context: <code>__enter__ __exit__</code></li>
+<li>Attributes: <code>__getattr__</code> (called only when lookup fails) vs <code>__getattribute__</code> (called every time)</li></ul>
+@@ f873d96911
+Q: What does __slots__ do?
+A:
+Declares a fixed list of attributes so instances no longer create a <code>__dict__</code>:<ul><li><b>Saves memory</b> (noticeable with many small objects)</li><li>Slightly faster attribute access</li><li>Prevents adding attributes dynamically</li></ul>
+Costs: no dynamic attributes, care is needed with multiple inheritance, and there is no <code>__weakref__</code> by default. <code>@dataclass(slots=True)</code> (3.10+) can generate it automatically.
+@@ 61718beb7a
+Q: What is a metaclass, and when would you use one?
+A:
+A class is an instance of a metaclass, and the default metaclass is <code>type</code>. <code>class A: ...</code> is equivalent to <code>A = type('A', bases, ns)</code>.<br>
+A custom metaclass can modify a class <b>when it is created</b>: auto-registering subclasses, validating attributes, collecting ORM fields (Django Model, early SQLAlchemy).<br>
+Most cases today can use the simpler <code>__init_subclass__</code> or a class decorator instead.
+@@ e503efdb2f
+Q: Duck typing vs ABC vs Protocol?
+A:
+<ul><li><b>Duck typing</b>: no type check; anything with the required methods works</li>
+<li><b>ABC</b> (<code>abc.ABC</code> + <code>@abstractmethod</code>): nominal subtyping; a class cannot be instantiated until abstract methods are implemented</li>
+<li><b>typing.Protocol</b>: structural subtyping (static duck typing); type checkers compare method signatures with no inheritance needed</li></ul>
+@@ 069502a6f7
+Q: What is the difference between dataclass, NamedTuple and Pydantic?
+A:
+<ul><li><b>dataclass</b>: auto-generates <code>__init__/__repr__/__eq__</code>; mutable (frozen=True makes it immutable); <b>no runtime type validation</b></li>
+<li><b>NamedTuple</b>: immutable, lightweight, indexable; it is a tuple</li>
+<li><b>Pydantic BaseModel</b>: runtime <b>validation and type coercion</b>, JSON serialization; used for FastAPI request/response models (the v2 core is written in Rust)</li></ul>
+@@ 8e8e8464bb
+Q: In Python exception handling, what is the execution order of try/except/else/finally?
+A:
+<ul><li>No exception in <code>try</code> → <code>else</code> → <code>finally</code></li>
+<li>Exception raised → matching <code>except</code> → <code>finally</code></li>
+<li><code>finally</code> <b>always runs</b>; a return inside finally overrides the try's return and swallows the exception (gotcha)</li></ul>
+Best practices: catch specific exceptions, avoid bare <code>except:</code> (it swallows KeyboardInterrupt/SystemExit), and re-raise with <code>raise ... from e</code> to keep the exception chain.
+@@ 7bb36d35d6
+Q: How is Python code executed (in CPython)?
+A:
+Source code → lexing/parsing → AST → compiled to <b>bytecode</b> (code objects, cached as <code>__pycache__/*.pyc</code>) → the CPython VM (a stack-based interpreter loop) executes it instruction by instruction.<br>
+Use <code>dis.dis(func)</code> to view bytecode. 3.11 introduced the adaptive specializing interpreter (a big speedup), and 3.13 added an experimental JIT.
+@@ f7d0ef36fd
+Q: Which parts of the standard library's collections, itertools and functools are most useful?
+A:
+<ul><li><b>collections</b>: <code>defaultdict</code>, <code>Counter</code>, <code>deque</code>, <code>OrderedDict</code> (<code>move_to_end</code> enables an LRU), <code>namedtuple</code></li>
+<li><b>itertools</b>: <code>chain</code>, <code>groupby</code> (sort first), <code>product</code>, <code>permutations</code>, <code>combinations</code>, <code>accumulate</code>, <code>islice</code></li>
+<li><b>functools</b>: <code>lru_cache</code>/<code>cache</code>, <code>partial</code>, <code>reduce</code>, <code>wraps</code>, <code>cmp_to_key</code>, <code>cached_property</code></li>
+<li><b>heapq</b> (min-heap), <b>bisect</b> (binary search)</li></ul>
+@@ bc8ca54c8c
+Q: How does functools.lru_cache work, and what should you watch out for?
+A:
+It implements LRU with a <b>hash table + doubly linked list</b>: arguments form the key, a hit returns in O(1) and moves the entry to most recent, and when full the least recently used entry is evicted.<br>
+Watch out for:<ul><li>Arguments must be hashable</li><li>On an instance method it holds a reference to self, so the object can't be freed</li><li>Default maxsize=128; <code>@cache</code> is equivalent to maxsize=None</li><li><code>.cache_info()</code> / <code>.cache_clear()</code> are available</li></ul>
+@@ 7f76bc36a8
+Q: Do Python type hints take effect at runtime?
+A:
+They are <b>not</b> enforced; the interpreter only stores them in <code>__annotations__</code>. Static tools such as mypy/pyright check them, and Pydantic/FastAPI read the annotations at runtime for validation and dependency injection.<br>
+Common forms: <code>Optional[X]</code> = <code>X | None</code> (3.10+), <code>list[int]</code> (3.9+), <code>TypedDict</code>, <code>Protocol</code>, <code>TypeVar</code>/generics, <code>Literal</code>, <code>Callable</code>.
+@@ c0245fa69a
+Q: Why is join recommended over += for building strings in Python?
+A:
+str is immutable, so <code>s += x</code> in a loop may allocate and copy a new string each time, worst case O(n²) (CPython has an in-place optimization, but it isn't reliable).<br>
+<code>''.join(parts)</code> computes the total length first and allocates once, O(n). For formatting, f-strings are the fastest and most readable.
+@@ 8d8a6b5fd3
+Q: What is the GIL, and how does it affect multithreading?
+A:
+The GIL (Global Interpreter Lock) is a mutex in CPython that ensures <b>only one thread executes Python bytecode at a time</b>.<br>
+<b>Why it exists</b>: CPython's reference counting isn't thread-safe, and the GIL simplifies the interpreter and C extensions.<br>
+<b>Effects</b>:<ul><li>CPU-bound work: threads can't use multiple cores and may even be slower (lock contention)</li>
+<li>I/O-bound work: threads <b>release the GIL</b> during blocking I/O, so multithreading still helps</li></ul>
+<b>Workarounds</b>: multiprocessing, C extensions that release the GIL (NumPy/PyTorch), asyncio (for I/O); since 3.13 there is an optional free-threaded (no-GIL) build (PEP 703).
+@@ 9dd4c2bd52
+Q: With the GIL, do Python threads still need locks?
+A:
+<b>Yes.</b> The GIL only makes a single bytecode atomic, not your <b>compound operations</b>.
+<pre><code>count += 1
+# = LOAD, ADD, STORE: several bytecodes; a thread switch in between → lost update</code></pre>
+A thread can be switched between any two bytecodes (default switch interval 5 ms, <code>sys.getswitchinterval()</code>). Shared mutable state needs <code>threading.Lock</code>, <code>queue.Queue</code>, etc.
+@@ eeba064e3d
+Q: When should you use threads, processes and coroutines (asyncio)?
+A:
+<table><tr><th></th><th>Threads</th><th>Processes</th><th>Coroutines</th></tr>
+<tr><td>Best for</td><td>I/O-bound work with blocking libraries</td><td>CPU-bound work</td><td>High-concurrency I/O (thousands of connections)</td></tr>
+<tr><td>Scheduling</td><td>OS, preemptive</td><td>OS</td><td>Event loop, <b>cooperative</b> (yields at await)</td></tr>
+<tr><td>Overhead</td><td>Medium (MB-sized stacks)</td><td>Large; IPC requires serialization</td><td>Tiny (KB-sized)</td></tr>
+<tr><td>Shared memory</td><td>Yes (needs locks)</td><td>No (Queue/Pipe/shared_memory)</td><td>Single thread, almost no races</td></tr></table>
+Common high-level API: <code>concurrent.futures.ThreadPoolExecutor / ProcessPoolExecutor</code>.
+@@ 4d794c364a
+Q: How does the asyncio event loop work?
+A:
+It runs a loop in a single thread:<ol><li>Run callbacks/tasks in the ready queue until each one suspends on <code>await</code> of an unfinished Future</li>
+<li>Call I/O multiplexing (epoll on Linux, via selectors) to wait for sockets to become ready or timers to fire</li>
+<li>Put the tasks of the now-ready Futures back in the ready queue</li></ol>
+Key point: coroutines voluntarily yield control at <code>await</code>, so <b>any blocking call (time.sleep, requests, heavy CPU work) stalls the whole loop</b>.
+@@ 179c97de40
+Q: What do you do about blocking code inside an async function?
+A:
+Blocking calls stall the event loop, so latency spikes for every request. Solutions:<ul>
+<li>Switch to async libraries: <code>httpx.AsyncClient</code>/<code>aiohttp</code> instead of requests, <code>asyncpg</code>, <code>aioboto3</code></li>
+<li>Offload to a thread pool: <code>await asyncio.to_thread(fn, *args)</code> or <code>loop.run_in_executor(None, fn)</code></li>
+<li>Send CPU-heavy work to a process pool</li></ul>
+In FastAPI: routes defined with <code>def</code> (not async) automatically run in a thread pool; never put blocking calls in an <code>async def</code>.
+@@ 9cbebfbc5c
+Q: What are the differences between a coroutine, Task and Future? asyncio.gather vs create_task?
+A:
+<ul><li><b>Coroutine object</b>: returned by calling an async function; it doesn't run until awaited or scheduled</li>
+<li><b>Future</b>: a low-level object representing a future result</li>
+<li><b>Task</b>: a Future subclass that wraps a coroutine and <b>schedules it on the event loop</b> to run concurrently</li></ul>
+<code>create_task(coro)</code> schedules immediately; <code>gather(*aws)</code> waits on several concurrently and returns results in order (<code>return_exceptions=True</code> collects exceptions). On 3.11+, <code>asyncio.TaskGroup</code> is recommended (structured concurrency: one failure cancels the others).<br>
+Use <code>asyncio.Semaphore</code> for rate limiting and <code>asyncio.timeout()</code> / <code>wait_for</code> for timeouts.
+@@ 01628c6371
+Q: What thread synchronization primitives does Python have?
+A:
+<ul><li><code>Lock</code>: mutex; <code>RLock</code>: reentrant lock (the same thread can acquire it repeatedly)</li>
+<li><code>Semaphore</code>: limits concurrency</li>
+<li><code>Event</code>: one thread notifies others</li>
+<li><code>Condition</code>: waits until a condition holds (producer-consumer)</li>
+<li><code>queue.Queue</code>: thread-safe queue, the most recommended way to communicate between threads</li>
+<li><code>Barrier</code>: synchronizes multiple threads at one point</li></ul>
+@@ 35f879d966
+Q: Write a thread-safe producer-consumer in Python.
+A:
+<pre><code>import threading, queue
+q = queue.Queue(maxsize=10)
+def producer():
+    for i in range(100):
+        q.put(i)          # blocks when full
+    q.put(None)           # poison pill signals the end
+def consumer():
+    while (item := q.get()) is not None:
+        process(item)
+        q.task_done()
+threading.Thread(target=producer).start()
+threading.Thread(target=consumer).start()</code></pre>
+The asyncio version uses <code>asyncio.Queue</code>.
+@@ beb8fa96e8
+Q: What is a deadlock? What causes it, and how do you prevent it?
+A:
+Two or more threads wait on resources held by each other and block forever.<br>
+<b>Four necessary conditions</b>: mutual exclusion, hold and wait, no preemption, circular wait.<br>
+<b>Prevention</b>:<ul><li>Acquire locks in a fixed global order (breaks circular wait)</li><li>Use lock timeouts: <code>lock.acquire(timeout=...)</code></li><li>Request all resources at once</li><li>Reduce lock granularity; use lock-free structures/queues</li></ul>
+@@ fbaf6a7ecd
+Q: How do processes communicate in multiprocessing, and what are the pitfalls?
+A:
+Options: <code>Queue</code>, <code>Pipe</code>, <code>Manager</code> (proxy objects), <code>Value/Array</code>, <code>shared_memory</code> (3.8+, zero-copy).<br>
+Pitfalls:<ul><li>Objects passed must be <b>pickle-serialized</b>: lambdas/local functions don't work, and large objects are costly</li>
+<li>macOS/Windows default to the <b>spawn</b> start method → code must be under <code>if __name__ == "__main__":</code></li>
+<li>On Linux, fork + threads can copy lock state and deadlock</li></ul>
+@@ 72b0549046
+Q: Implement an LRU Cache in Python (get/put both O(1)).
+A:
+Idea: <b>hash table + doubly linked list</b>. In Python you can use OrderedDict directly:
+<pre><code>from collections import OrderedDict
+class LRUCache:
+    def __init__(self, cap):
+        self.cap, self.d = cap, OrderedDict()
+    def get(self, k):
+        if k not in self.d: return -1
+        self.d.move_to_end(k)
+        return self.d[k]
+    def put(self, k, v):
+        self.d[k] = v
+        self.d.move_to_end(k)
+        if len(self.d) &gt; self.cap:
+            self.d.popitem(last=False)</code></pre>
+The interviewer may ask you to hand-write the doubly linked list (dummy head/tail nodes). You can connect this to vLLM's KV-cache LRU eviction.
+@@ 0684a70232
+Q: How do you use Python's heapq? How do you build a max-heap and Top-K?
+A:
+heapq is a <b>min-heap</b> on top of a list: <code>heappush / heappop / heapify(O(n)) / heapreplace / nlargest / nsmallest</code>.<br>
+Max-heap: store negatives <code>-x</code>, or store <code>(-priority, idx, item)</code> (idx breaks ties so incomparable objects are never compared).<br>
+Top-K largest: keep a <b>min-heap</b> of size K and replace the top whenever a new element is larger → O(n log k).
+@@ 5fda6f2771
+Q: What are the complexities and stability of common sorting algorithms? What does Python's sort use?
+A:
+<table><tr><th>Algorithm</th><th>Average</th><th>Worst</th><th>Space</th><th>Stable</th></tr>
+<tr><td>Quicksort</td><td>n log n</td><td>n²</td><td>log n</td><td>No</td></tr>
+<tr><td>Merge sort</td><td>n log n</td><td>n log n</td><td>n</td><td>Yes</td></tr>
+<tr><td>Heapsort</td><td>n log n</td><td>n log n</td><td>1</td><td>No</td></tr>
+<tr><td>Insertion sort</td><td>n²</td><td>n²</td><td>1</td><td>Yes</td></tr></table>
+Python's <code>sorted/list.sort</code> uses <b>Timsort</b> (a hybrid of merge and insertion sort that exploits existing sorted runs): stable, best case O(n). Since CPython 3.11 it uses Powersort's merge strategy.
+@@ 0adc61b865
+Q: What is the binary search template, and how do you use bisect?
+A:
+<pre><code>def lower_bound(a, x):  # first position with value &gt;= x
+    lo, hi = 0, len(a)
+    while lo &lt; hi:
+        mid = (lo + hi) // 2
+        if a[mid] &lt; x: lo = mid + 1
+        else: hi = mid
+    return lo</code></pre>
+<code>bisect_left</code> = lower_bound; <code>bisect_right</code> = first position &gt; x. <code>insort</code> inserts while keeping order (the insertion itself is O(n)).<br>
+Binary search on the answer: when the answer is monotonic, search over the answer space (e.g. minimize the maximum).
+@@ 22ec490437
+Q: BFS vs DFS? What problems does each suit?
+A:
+<ul><li><b>BFS</b> (deque as a queue): expands level by level; <b>shortest paths in unweighted graphs</b>, level-order traversal, multi-source spreading (rotting oranges)</li>
+<li><b>DFS</b> (recursion/stack): connected components, backtracking (permutations/combinations), topological sort, cycle detection</li></ul>
+Python's default recursion limit is about 1000 (<code>sys.setrecursionlimit</code>), so prefer iteration on deep graphs. For weighted shortest paths use Dijkstra (heapq).
+@@ 882f68180c
+Q: What is topological sorting, and how do you implement it?
+A:
+Orders the vertices of a DAG so that for each edge u→v, u comes before v. Used for task dependencies, course schedules and build systems.<br>
+<b>Kahn's algorithm</b>: count in-degrees → enqueue nodes with in-degree 0 → on dequeue, decrement neighbors' in-degrees and enqueue those reaching 0. If the result has fewer than all nodes, there is a cycle. O(V+E).
+@@ 1be39d3ab5
+Q: Compare hash tables, balanced trees (red-black trees) and skip lists.
+A:
+<ul><li><b>Hash table</b>: average O(1) lookup, unordered, no range queries</li>
+<li><b>Red-black tree</b>: O(log n), ordered, supports range queries (Java TreeMap, C++ map)</li>
+<li><b>Skip list</b>: expected O(log n), ordered, simple to implement and concurrency-friendly (Redis ZSet, LSM-tree MemTable)</li>
+<li><b>B+ tree</b>: multi-way balanced tree, disk-friendly, used for database indexes</li></ul>
+Python has no built-in ordered map; use <code>sortedcontainers.SortedList</code>.
+@@ 1542b68e87
+Q: How do you approach dynamic programming problems?
+A:
+<ol><li>Define what state <code>dp[i]</code> means</li><li>Write the transition equation</li><li>Set initial values/boundaries</li><li>Determine the iteration order</li><li>Optimize space (rolling array)</li></ol>
+Applies when there is <b>optimal substructure + overlapping subproblems</b>. In Python, start with recursion + <code>@cache</code> (memoization), then convert to iteration.<br>
+Classics: climbing stairs, knapsack, LIS, LCS, edit distance, stock trading.
+@@ a254bf685c
+Q: What are the typical sliding window and two-pointer problems?
+A:
+<ul><li><b>Sliding window</b>: longest substring without repeats, minimum window substring, max sum of length k. Template: expand the right pointer, shrink the left pointer when the condition breaks, and track window state with a dict/Counter</li>
+<li><b>Two pointers</b>: two sum on a sorted array, three sum, container with most water, fast/slow pointers on linked lists (detect cycles, find the middle)</li>
+<li><b>Monotonic stack</b>: next greater element, largest rectangle in a histogram; <b>monotonic queue</b>: sliding window maximum</li></ul>
+@@ 7632351576
+Q: What is consistent hashing, and what problem does it solve?
+A:
+Maps both nodes and keys onto a hash ring; a key goes clockwise to the first node it reaches.<br>
+<b>Solves</b>: with plain modulo <code>hash(k) % N</code>, adding or removing a node moves almost every key; consistent hashing moves only about 1/N.<br>
+<b>Virtual nodes</b>: each physical node maps to many points, which fixes data skew.<br>
+Applications: Cassandra, DynamoDB (partitioning), distributed caches, LLM request routing (hashing by prefix for cache-aware routing).
+@@ 73f93aa759
+Q: What is the difference between processes, threads and coroutines?
+A:
+<ul><li><b>Process</b>: the basic unit of resource allocation; separate address space; expensive to switch (page tables change, TLB is flushed)</li>
+<li><b>Thread</b>: the basic unit of CPU scheduling; shares the process's address space and file descriptors, with its own stack and registers</li>
+<li><b>Coroutine</b>: a lightweight user-space thread scheduled by the program itself (cooperatively); a switch saves only a little context and doesn't involve the kernel</li></ul>
+@@ c903452cc0
+Q: What are the inter-process communication (IPC) mechanisms?
+A:
+Pipes (anonymous / named FIFO), message queues, <b>shared memory</b> (fastest, needs synchronization), semaphores, signals, <b>sockets</b> (work across machines), and memory-mapped files (mmap).
+@@ 7319738888
+Q: What states can a process be in? What is a context switch?
+A:
+States: new → ready ⇄ running → blocked (waiting for I/O) → ready … → terminated.<br>
+<b>Context switch</b>: save the current process/thread's registers, PC, stack pointer and so on, then load another's. A process switch also changes page tables (invalidating the TLB), so it costs more. Frequent switching wastes CPU on scheduling.
+@@ 3f327ae588
+Q: What is virtual memory, and how does paging work?
+A:
+Each process sees its own contiguous virtual address space, which the MMU maps to physical page frames through <b>page tables</b>.<br>
+<ul><li>Pages are usually 4 KB; multi-level page tables save space; the <b>TLB</b> caches recent mappings</li>
+<li>Accessing a page not in memory → <b>page fault</b>, and it is swapped in from disk</li>
+<li>Page replacement algorithms: FIFO, LRU, Clock</li></ul>
+Benefits: process isolation, using more space than physical memory, shared libraries, copy-on-write (fork).<br>
+Connection: vLLM's <b>PagedAttention</b> borrows exactly this paging idea to manage the KV cache.
+@@ f85e5ed610
+Q: What are fork() and copy-on-write (COW)?
+A:
+<code>fork()</code> creates a child process and returns twice (the parent gets the child's PID, the child gets 0).<br>
+<b>COW</b>: parent and child share physical pages marked read-only; a write by either side triggers a page fault that copies that page. This makes fork fast.<br>
+Note that in Python, reference counting writes to object headers, so COW pages get copied in bulk (Instagram mitigated this with <code>gc.freeze()</code>).
+@@ e46ff424d0
+Q: What are user mode and kernel mode? What is a system call?
+A:
+CPU privilege levels: user mode cannot directly access hardware or kernel memory; kernel mode has full privileges.<br>
+<b>System calls</b> (read/write/open/fork/mmap) are the interface through which user programs request kernel services. They switch to kernel mode via a trap and carry some overhead. Interrupts and exceptions also enter kernel mode.
+@@ ff010c7177
+Q: I/O multiplexing: how do select, poll and epoll differ?
+A:
+<ul><li><b>select</b>: fd set is a bitmap with a limit of 1024; each call copies it to the kernel and scans linearly, O(n)</li>
+<li><b>poll</b>: uses an array with no limit, but still scans in O(n)</li>
+<li><b>epoll</b> (Linux): <code>epoll_ctl</code> registers once; the kernel tracks fds in a red-black tree and returns ready fds from a ready list; <code>epoll_wait</code> is O(number ready). Supports level-triggered (LT) and edge-triggered (ET) modes</li></ul>
+asyncio, Nginx, Redis and Node.js are all built on this.
+@@ 044734cac9
+Q: What is the difference between blocking/non-blocking and synchronous/asynchronous I/O?
+A:
+<ul><li><b>Blocking vs non-blocking</b>: when data isn't ready, does the call wait or return immediately (EAGAIN)?</li>
+<li><b>Synchronous vs asynchronous</b>: does the caller itself perform the copy from kernel to user space?</li></ul>
+The five I/O models: blocking, non-blocking, I/O multiplexing, signal-driven, asynchronous I/O (io_uring / Windows IOCP). The first four are all synchronous I/O.
+@@ 584fb22d56
+Q: What process scheduling algorithms are there?
+A:
+FCFS, shortest job first (SJF), priority scheduling, <b>round robin (RR)</b>, multilevel feedback queue (MLFQ). Linux long used <b>CFS</b> (selects by vruntime, using a red-black tree) and switched to EEVDF in 6.6.<br>
+Connection: request scheduling in LLM serving (FCFS, continuous batching, prefill/decode priority) makes similar tradeoffs: throughput vs latency vs fairness.
+@@ 68669c0863
+Q: What are orphan and zombie processes?
+A:
+<ul><li><b>Zombie process</b>: the child has exited but the parent hasn't called wait() to reap it, so its process table entry remains (state Z)</li>
+<li><b>Orphan process</b>: the parent exits first and the child is adopted by init/systemd (PID 1)</li></ul>
+Fixing zombies: the parent calls wait/waitpid and handles SIGCHLD; in Docker, PID 1 must be able to reap children (use tini / <code>--init</code>).
+@@ 40705945de
+Q: What Linux commands are commonly used for troubleshooting?
+A:
+<ul><li>CPU/memory: <code>top/htop</code>, <code>free -h</code>, <code>vmstat</code></li>
+<li>Processes: <code>ps aux</code>, <code>kill -9</code>, <code>lsof -p PID</code></li>
+<li>Network: <code>ss -tlnp</code>/<code>netstat</code>, <code>curl -v</code>, <code>dig</code>, <code>tcpdump</code></li>
+<li>Disk: <code>df -h</code>, <code>du -sh *</code>, <code>iostat</code></li>
+<li>Logs: <code>tail -f</code>, <code>grep -rn</code>, <code>journalctl</code></li>
+<li>GPU: <code>nvidia-smi</code></li></ul>
+@@ 1b6cb1e6a3
+Q: What is the difference between TCP and UDP?
+A:
+<table><tr><th></th><th>TCP</th><th>UDP</th></tr>
+<tr><td>Connection</td><td>Connection-oriented</td><td>Connectionless</td></tr>
+<tr><td>Reliability</td><td>Reliable, ordered (acks/retransmission/sequence numbers)</td><td>No guarantee</td></tr>
+<tr><td>Control</td><td>Flow control, congestion control</td><td>None</td></tr>
+<tr><td>Transfer</td><td>Byte stream</td><td>Datagrams</td></tr>
+<tr><td>Header</td><td>20B+</td><td>8B</td></tr>
+<tr><td>Use cases</td><td>HTTP/1.1/2, databases</td><td>DNS, video, games, QUIC (HTTP/3)</td></tr></table>
+@@ aac57d7527
+Q: How does the TCP three-way handshake work? Why not two ways?
+A:
+<ol><li>C → S: SYN, seq=x</li><li>S → C: SYN+ACK, seq=y, ack=x+1</li><li>C → S: ACK, ack=y+1</li></ol>
+<b>Why three</b>: both sides must confirm that they and their peer can send and receive, and must synchronize initial sequence numbers; it also prevents a <b>stale old SYN</b> reaching the server from wrongly establishing a connection and wasting resources.
+@@ a29b46967d
+Q: How does the TCP four-way teardown work? Why does TIME_WAIT wait 2MSL?
+A:
+<ol><li>Active closer sends FIN</li><li>Passive side sends ACK (enters CLOSE_WAIT, may still have data to send)</li><li>Passive side sends FIN</li><li>Active closer sends ACK and enters <b>TIME_WAIT</b></li></ol>
+It takes four steps because TCP is full duplex and each direction closes separately.<br>
+<b>2MSL</b>: makes sure the final ACK can be resent if lost, and lets old packets die out of the network so they can't disturb a new connection.<br>
+Many TIME_WAITs: use connection pools/keep-alive, <code>SO_REUSEADDR</code>. Many CLOSE_WAITs usually mean a bug where the <b>application doesn't close the connection</b>.
+@@ af87527a2f
+Q: How does TCP ensure reliable delivery? What is the difference between flow control and congestion control?
+A:
+Reliability: sequence numbers + ACKs, timeout retransmission, fast retransmit (3 duplicate ACKs), checksums, sliding window.<br>
+<b>Flow control</b>: prevents the sender from overwhelming the <b>receiver</b>, using the receive window rwnd.<br>
+<b>Congestion control</b>: prevents overwhelming the <b>network</b>, using cwnd: slow start (exponential) → congestion avoidance (linear) → multiplicative decrease on loss (fast recovery). Modern algorithms include CUBIC and BBR.
+@@ 90139413f8
+Q: What happens between typing a URL into the browser and the page being displayed?
+A:
+<ol><li>Parse the URL; check browser/OS caches</li>
+<li><b>DNS resolution</b> (recursive → root → TLD → authoritative) gives an IP; it may hit a CDN edge node (e.g. CloudFront)</li>
+<li><b>TCP three-way handshake</b> (HTTP/3 uses QUIC/UDP)</li>
+<li><b>TLS handshake</b>: negotiate keys, verify the certificate</li>
+<li>Send the HTTP request → load balancer → backend service → database/cache</li>
+<li>Return the response; the browser parses HTML, builds the DOM/CSSOM and renders</li>
+<li>The connection is reused with keep-alive or closed</li></ol>
+@@ 80b48fc96a
+Q: What is the difference between HTTP/1.1, HTTP/2 and HTTP/3?
+A:
+<ul><li><b>1.1</b>: text protocol with keep-alive connections, but requests on one connection are serial → head-of-line blocking (browsers open several connections)</li>
+<li><b>2</b>: binary framing, <b>multiplexing</b> (many streams on one connection), HPACK header compression, server push. Head-of-line blocking still exists at the TCP layer</li>
+<li><b>3</b>: built on <b>QUIC (UDP)</b>, with independent streams, 0-RTT/1-RTT handshakes and connection migration</li></ul>
+gRPC is built on HTTP/2.
+@@ a81c030901
+Q: How does HTTPS work? What is the TLS handshake process?
+A:
+HTTPS = HTTP + TLS. <b>Asymmetric encryption</b> is used to exchange/negotiate keys, then <b>symmetric encryption</b> transfers the data (fast).<br>
+Simplified TLS 1.2 flow: ClientHello (supported suites, random number) → ServerHello + certificate → client validates the certificate chain with CAs → (EC)DHE key exchange → session keys generated → Finished.<br>
+TLS 1.3: 1-RTT, supports 0-RTT resumption, removes insecure algorithms and keeps only forward-secure key exchange.<br>
+Certificates prevent man-in-the-middle attacks.
+@@ 1b5039922d
+Q: What are the common HTTP status codes?
+A:
+<ul><li>200 OK, 201 Created, 204 No Content</li>
+<li>301 permanent redirect, 302 temporary redirect, 304 Not Modified (cache)</li>
+<li>400 Bad Request, 401 unauthenticated, 403 forbidden, 404, 409 Conflict, 422 validation failure (FastAPI's default), 429 Too Many Requests</li>
+<li>500 server error, 502 Bad Gateway (invalid response from upstream), 503 unavailable, 504 Gateway Timeout (upstream timed out)</li></ul>
+@@ 82d22fe451
+Q: What is the difference between GET and POST? What does idempotent mean?
+A:
+Semantics: GET reads; POST creates/submits. GET parameters go in the URL (cacheable, bookmarkable, limited length); POST parameters go in the body.<br>
+<b>Idempotent</b>: running it many times has the same effect as once. GET, PUT, DELETE and HEAD are idempotent; POST and PATCH generally aren't.<br>
+Retry design: deduplicate non-idempotent operations with an <b>idempotency key (Idempotency-Key)</b>.
+@@ 8663ef8324
+Q: What is the difference between Cookie, Session and JWT?
+A:
+<ul><li><b>Cookie</b>: stored in the browser and sent automatically with requests (HttpOnly, Secure, SameSite attributes)</li>
+<li><b>Session</b>: state lives on the server (Redis) and the client holds only a session id; can be revoked at any time but needs shared storage</li>
+<li><b>JWT</b>: header.payload.signature, <b>stateless</b>; the server only verifies the signature, which suits distributed systems. Downsides: hard to revoke early, and the payload is only Base64, not encrypted</li></ul>
+@@ bb46f8c66d
+Q: What are the OSI seven-layer and TCP/IP four-layer models?
+A:
+OSI: physical, data link, network, transport, session, presentation, application.<br>
+TCP/IP: link layer (Ethernet), network layer (IP, ICMP), transport layer (TCP/UDP), application layer (HTTP, DNS, TLS*).<br>
+L4 load balancers (such as NLB) forward by IP+port; L7 (such as ALB, Nginx) can route by URL/header.
+@@ c0318d85d1
+Q: What is a CDN? How does hosting a frontend on CloudFront + S3 work?
+A:
+A CDN caches content at <b>edge nodes</b> close to users, reducing latency and origin load.<br>
+S3 stores static files (React build output) as the <b>origin</b> and CloudFront distributes them: a user request goes to the nearest edge → a cache hit returns directly, a miss fetches from S3.<br>
+Key points: OAC/OAI restrict S3 so that only CloudFront can access it; use hashed file names + long TTLs, and a short TTL for index.html; invalidate after a release; SPAs must fall back from 403/404 to index.html.
+@@ 286a5e2dcc
+Q: What is ACID in transactions?
+A:
+<ul><li><b>A</b>tomicity: all succeed or all roll back (undo log)</li>
+<li><b>C</b>onsistency: constraints hold before and after the transaction</li>
+<li><b>I</b>solation: concurrent transactions don't interfere (locks / MVCC)</li>
+<li><b>D</b>urability: nothing is lost after commit (redo log / WAL)</li></ul>
+@@ 47cdf4f0c8
+Q: What are the transaction isolation levels, and what does each solve?
+A:
+<table><tr><th>Level</th><th>Dirty read</th><th>Non-repeatable read</th><th>Phantom read</th></tr>
+<tr><td>Read Uncommitted</td><td>✗</td><td>✗</td><td>✗</td></tr>
+<tr><td>Read Committed, RC (PostgreSQL default)</td><td>✓</td><td>✗</td><td>✗</td></tr>
+<tr><td>Repeatable Read, RR (MySQL InnoDB default)</td><td>✓</td><td>✓</td><td>Partly ✓ (MVCC + gap locks)</td></tr>
+<tr><td>Serializable</td><td>✓</td><td>✓</td><td>✓</td></tr></table>
+(✓ = solved)
+@@ 1ffa029565
+Q: What is MVCC?
+A:
+Multi-version concurrency control: each row keeps multiple versions (InnoDB uses hidden fields trx_id + roll_pointer pointing to an undo log version chain), and reads use a <b>Read View</b> to decide which version is visible.<br>
+Effect: <b>reads take no locks, and reads and writes don't block each other</b>. RC creates a new Read View per query; RR creates one at the transaction's first read and reuses it.
+@@ 6c53d59a1b
+Q: Why do database indexes use B+ trees rather than B-trees, hashes or binary trees?
+A:
+<ul><li>Multi-way → the tree is very short (3–4 levels hold tens of millions of rows), so <b>few disk I/Os</b></li>
+<li>Data lives only in leaf nodes, so internal nodes hold more keys</li>
+<li>Leaf nodes are linked → efficient <b>range queries and sorting</b></li>
+<li>Hashes don't support range queries; binary/red-black trees are too tall</li></ul>
+@@ 0b459ee10e
+Q: What are clustered indexes, non-clustered indexes, covering indexes and "going back to the table"?
+A:
+<ul><li><b>Clustered index</b>: leaves store the whole row (the InnoDB primary key)</li>
+<li><b>Secondary index</b>: leaves store the primary key value, so fetching other columns requires another lookup on the primary index → <b>going back to the table</b></li>
+<li><b>Covering index</b>: all queried columns are in the index, so no table lookup is needed</li></ul>
+@@ 4d3b99da5c
+Q: What is the leftmost-prefix rule of composite indexes? When does an index stop being used?
+A:
+Index (a,b,c): usable for conditions on <code>a</code>, <code>a,b</code>, <code>a,b,c</code>; not for <code>b</code> alone. Columns after a range condition can't be used for locating rows.<br>
+<b>Failure cases</b>: functions/arithmetic on the indexed column, implicit type conversion, <code>LIKE '%x'</code> with a leading wildcard, OR with a non-indexed column, violating the leftmost prefix, and the optimizer judging a full table scan faster.<br>
+Use <code>EXPLAIN</code> to view the execution plan.
+@@ 5f8596772b
+Q: SQL: find the highest-paid employee in each department / the Nth highest salary.
+A:
+<pre><code>-- window function
+SELECT * FROM (
+  SELECT *, DENSE_RANK() OVER (
+    PARTITION BY dept_id ORDER BY salary DESC) AS rk
+  FROM employee) t
+WHERE rk = 1;</code></pre>
+Be able to explain the difference between <code>ROW_NUMBER</code> (1,2,3), <code>RANK</code> (1,1,3) and <code>DENSE_RANK</code> (1,1,2).<br>
+Execution order: FROM → WHERE → GROUP BY → HAVING → SELECT → ORDER BY → LIMIT (which is why WHERE can't use aggregates but HAVING can).
+@@ af13ff4872
+Q: How do you choose between SQL and NoSQL?
+A:
+<ul><li><b>SQL</b>: strong schema, complex joins, strongly consistent transactions (orders, payments)</li>
+<li><b>NoSQL</b>: horizontal scaling, flexible schema, high throughput, known access patterns<ul>
+<li>KV: DynamoDB, Redis</li><li>Wide-column: Cassandra, HBase</li><li>Document: MongoDB</li><li>Graph: Neo4j</li></ul></li></ul>
+Key point: NoSQL usually <b>models around queries</b> (query-first design), denormalizing and avoiding joins.
+@@ 594a6b810b
+Q: What are DynamoDB's partition key, sort key and GSI/LSI? How do you avoid hot partitions?
+A:
+<ul><li><b>Partition key</b>: its hash decides which partition holds the data</li>
+<li><b>Sort key</b>: ordered within a partition, supports range queries (<code>begins_with</code>, between)</li>
+<li><b>GSI</b>: global secondary index; can use a different PK, is eventually consistent, and has its own throughput</li>
+<li><b>LSI</b>: same PK, different SK; must be created with the table</li></ul>
+Query uses keys (efficient); Scan reads the whole table (avoid it).<br>
+<b>Hot partitions</b>: pick a high-cardinality PK; shard writes (add a random suffix to the PK); use On-Demand mode + adaptive capacity.<br>
+Single-table design: composite keys like <code>PK=SERVICE#x, SK=DEPLOY#ts</code> support multiple access patterns.
+@@ dd5f2687f4
+Q: What are Cassandra's data model and write path?
+A:
+Wide-column store with a masterless (peer-to-peer) architecture, consistent-hash partitioning and <b>tunable consistency</b> (ONE / QUORUM / ALL; R+W&gt;N gives strong consistency).<br>
+<b>Write path (LSM-tree)</b>: write to the commit log → write to the MemTable → when full, flush to an immutable SSTable → background compaction merges them. Writes are sequential I/O and very fast.<br>
+Reads: MemTable + multiple SSTables, using Bloom filters to skip SSTables without the key.<br>
+Modeling: primary key = partition key + clustering columns; design tables around queries.
+@@ 6d0a62593b
+Q: Why is Redis fast? What are its common data structures and uses?
+A:
+Fast because: purely in-memory, single-threaded command execution (no lock contention; network I/O can be multithreaded since 6.0), epoll multiplexing, efficient data structures.<br>
+<ul><li>String: caching, counters, distributed locks (<code>SET key val NX PX</code>)</li>
+<li>Hash: objects; List: queues; Set: deduplication</li>
+<li>ZSet (skip list + hash): leaderboards, delay queues</li>
+<li>Stream: message queues</li></ul>
+Persistence: RDB snapshots, AOF logs.
+@@ d5e1ccb34f
+Q: What are cache penetration, cache breakdown and cache avalanche?
+A:
+<ul><li><b>Penetration</b>: querying nonexistent data hits the DB every time → cache empty values, Bloom filter, validate parameters</li>
+<li><b>Breakdown</b>: a hot key expires and a burst of requests hits the DB → mutex for rebuilding, logical expiry/never expire</li>
+<li><b>Avalanche</b>: many keys expire at once or the cache goes down → random TTL jitter, multi-level caches, rate limiting and degradation, highly available clusters</li></ul>
+Cache-DB consistency: Cache-Aside is common (update the DB, then delete the cache), optionally with delayed double delete.
+@@ 3023119a4c
+Q: What is the CAP theorem?
+A:
+When a <b>network partition (P)</b> occurs, a distributed system must choose between <b>consistency (C)</b> and <b>availability (A)</b>. Partitions are unavoidable, so the real choice is CP vs AP.<br>
+<ul><li>CP: ZooKeeper, etcd, HBase</li><li>AP: Cassandra, DynamoDB (eventually consistent by default, with optional strongly consistent reads)</li></ul>
+Extension: <b>PACELC</b>: even without a partition, you trade off latency (L) against consistency (C).
+@@ 364eb1c6e7
+Q: What are strong consistency, eventual consistency and causal consistency?
+A:
+<ul><li><b>Strong (linearizable)</b>: after a write, every read sees the latest value</li>
+<li><b>Eventual</b>: once writes stop, replicas eventually converge</li>
+<li><b>Causal</b>: all nodes see causally related operations in the same order</li>
+<li><b>Read-your-writes</b>: you always see your own writes</li></ul>
+DynamoDB defaults to eventually consistent reads; you can specify <code>ConsistentRead=True</code> (not supported on GSIs).
+@@ 1f12cb0001
+Q: What are Kafka's core concepts? How does it keep messages ordered and not lost?
+A:
+<ul><li>A <b>topic</b> is split into <b>partitions</b> (append-only logs) spread across brokers, with replicas (leader + followers, ISR)</li>
+<li>Messages are <b>ordered</b> within a partition; the same key goes to the same partition</li>
+<li><b>Consumer group</b>: each partition is consumed by one consumer in the group, scaling consumption; consumers track their own offsets</li></ul>
+<b>No loss</b>: producer <code>acks=all</code> + retries + idempotent producer; broker <code>min.insync.replicas≥2</code>; consumers commit offsets after processing.<br>
+<b>Exactly-once</b>: idempotent producer + transactions, or idempotent dedup on the consumer.
+@@ 2c8a0558ac
+Q: What are message queues for? At-most-once / at-least-once / exactly-once?
+A:
+Purposes: <b>decoupling, asynchrony, smoothing traffic peaks</b>, broadcasting.<br>
+<ul><li>At-most-once: commit then process; may lose messages</li>
+<li>At-least-once: process then commit; may duplicate → consumers must be <b>idempotent</b> (most common)</li>
+<li>Exactly-once: the most expensive; usually achieved in effect through "at least once + idempotency"</li></ul>
+AWS: SQS (queues), SNS (pub/sub), Kinesis/MSK (streams), EventBridge.
+@@ 421e70f065
+Q: How do you design a rate limiter? What are the common algorithms?
+A:
+<ul><li><b>Fixed window</b>: a counter; bursts at window boundaries</li>
+<li><b>Sliding window</b>: a log or weighted counts; smoother</li>
+<li><b>Token bucket</b>: tokens are added at a fixed rate, allowing some bursts (used by API Gateway)</li>
+<li><b>Leaky bucket</b>: flows out at a fixed rate, smoothing traffic</li></ul>
+Distributed: Redis + a Lua script for atomicity. Return 429 + <code>Retry-After</code>.
+@@ 4e3abf59c2
+Q: What is load balancing? What are common strategies?
+A:
+Distributes requests across multiple backend instances. Strategies: round robin, weighted round robin, least connections, IP hash/consistent hash (session stickiness, cache affinity), random / Power of Two Choices.<br>
+L4 (NLB) vs L7 (ALB, Nginx, Envoy). Needs health checks.<br>
+Connection to LLM serving: <b>cache-aware routing</b> sends requests sharing a prefix to the same instance to raise the KV-cache hit rate, but that must be balanced against load (it creates hot spots and queueing delay).
+@@ 65e849708f
+Q: What should you watch out for with retries in distributed systems?
+A:
+<ul><li><b>Exponential backoff + jitter</b>, to avoid a "thundering herd" of simultaneous retries</li>
+<li>Retry only retryable errors (timeouts, 5xx, 429), not 4xx</li>
+<li>Ensure <b>idempotency</b> (idempotency keys)</li>
+<li>Set a maximum count and total timeout; use retry budgets / <b>circuit breakers</b> to prevent cascading failures</li>
+<li>Don't retry at every layer of a call chain (retry amplification)</li></ul>
+@@ a644462f2e
+Q: What are circuit breaking, degradation and timeouts?
+A:
+<ul><li><b>Timeout</b>: every downstream call must have one</li>
+<li><b>Circuit breaker</b>: opens when the error rate passes a threshold and fails fast; after a while it goes half-open to probe for recovery</li>
+<li><b>Degradation / fallback</b>: returns a fallback result when a dependency fails (cache, default value, backup service)</li></ul>
+Connection: Prime Video's <b>CDN fallback</b> is essentially an availability safety net: when the primary CDN has problems, it switches to a backup path.
+@@ bb74e9c182
+Q: How do you implement a distributed lock?
+A:
+<ul><li><b>Redis</b>: <code>SET lock uuid NX PX 30000</code>; release with a Lua script that compares the uuid before deleting (so you don't delete someone else's lock); renew the lock (watchdog); Redlock is controversial</li>
+<li><b>ZooKeeper/etcd</b>: ephemeral sequential nodes / leases; more reliable (CP)</li>
+<li><b>DynamoDB</b>: conditional write <code>attribute_not_exists</code> + TTL</li></ul>
+Note: a GC pause can leave a process believing it still holds an expired lock → use a <b>fencing token</b>.
+@@ 3f7575bb83
+Q: What is Raft (briefly)?
+A:
+A consensus algorithm that gets multiple nodes to agree on a log.<ul><li><b>Leader election</b>: a follower that times out becomes a candidate, and becomes leader with a majority of votes (at most one leader per term)</li>
+<li><b>Log replication</b>: the leader takes write requests and commits after replicating to a majority</li>
+<li><b>Safety</b>: only a node with the most up-to-date log can be elected</li></ul>
+Tolerates (N-1)/2 node failures. Used in etcd and Consul.
+@@ b50998f359
+Q: What is a framework for answering system design interviews?
+A:
+<ol><li><b>Clarify requirements</b>: functional and non-functional (QPS, latency, availability, consistency)</li>
+<li><b>Estimate</b>: QPS, storage, bandwidth</li>
+<li><b>API design</b></li>
+<li><b>Data model</b> and storage choice</li>
+<li><b>High-level architecture</b>: client → LB → service → cache → DB → queue</li>
+<li><b>Deep dive</b>: bottlenecks, scaling (sharding, replicas, caching), fault tolerance, monitoring</li>
+<li>Discuss tradeoffs</li></ol>
+@@ 13a6d8775c
+Q: What are the key points in designing a URL shortener (TinyURL)?
+A:
+<ul><li>API: <code>POST /shorten</code>, <code>GET /{code}</code> → 301/302</li>
+<li>Generating codes: auto-increment ID + Base62 (needs distributed IDs: segment allocation/Snowflake), or truncated hash + collision detection</li>
+<li>Storage: KV (DynamoDB/Cassandra) with code as the key</li>
+<li>Read-heavy → cache hot entries (Redis, CDN)</li>
+<li>Browsers cache 301 (reduces load); 302 makes click tracking easier</li>
+<li>Extensions: write analytics asynchronously to Kafka; expire with TTL</li></ul>
+@@ b84b7f9cf4
+Q: Why can "precomputation" dramatically reduce API latency? What does it cost?
+A:
+The read path changes from "fan out to several downstream APIs at request time and aggregate" (latency set by the slowest one + serial overhead) to "read one pre-aggregated table" (a single KV read, in milliseconds). In essence you <b>trade write amplification and storage for read latency</b>, like materialized views / CQRS.<br>
+<b>Costs</b>: data freshness (eventually consistent, depending on refresh frequency), extra storage and compute, handling refresh failures and backfills, and migrations when the schema changes.<br>
+→ In the interview, be able to explain where 1000ms → 99ms comes from and how you weighed freshness.
+@@ a796e324b6
+Q: What is a Lambda cold start, and how do you optimize it?
+A:
+Cold start: a new execution environment must download code, start the runtime and run initialization code (everything outside the handler).<br>
+Optimizations:<ul><li>Shrink the deployment package/dependencies; lazy-load</li><li>Put SDK clients and DB connections outside the handler (reuses the environment)</li><li>Provisioned Concurrency; SnapStart for Java (now also for Python)</li><li>Raise memory (which also raises CPU)</li></ul>
+Limits: 15 minutes maximum, default concurrency quota, /tmp space, payload size.
+@@ 396a5837a1
+Q: How do you choose between Lambda and ECS (Fargate)?
+A:
+<ul><li><b>Lambda</b>: event-driven, short tasks (≤15 min), bursty/sparse traffic, per-invocation billing, no ops</li>
+<li><b>ECS/Fargate</b>: long-running tasks, always-on services, more resources/custom runtimes, cheaper at steady high traffic</li></ul>
+A common combination: EventBridge schedules Lambda for light tasks, ECS tasks do heavy batch computation, and results are written to DynamoDB.
+@@ 1c01ed6d49
+Q: What does API Gateway do?
+A:
+A managed API front door: routing to Lambda/HTTP backends, auth (IAM, Cognito, Lambda authorizer), <b>rate limiting (token bucket)</b>, caching, request validation, CORS, usage plans/API keys.<br>
+REST API vs HTTP API (cheaper and faster, fewer features) vs WebSocket API. The integration timeout defaults to a 29-second maximum.
+@@ 56e20bb56e
+Q: What are Step Functions, and what are they good for?
+A:
+A managed <b>state machine / workflow orchestration</b> service. Steps are defined in Amazon States Language (JSON): Task, Choice, Parallel, Map, Wait, Retry/Catch.<br>
+Good for: multi-step processes, retries and error handling, long-running jobs, human approval. Standard (up to 1 year, exactly-once) vs Express (high throughput, short-lived).<br>
+Compared with agents: Step Functions are <b>deterministic</b> flows; in an LLM agent the model <b>dynamically decides</b> the next step.
+@@ d66af5f7f9
+Q: What is AppConfig? Why release configuration separately from code?
+A:
+AWS AppConfig hosts and <b>safely deploys</b> configuration/feature flags: validators (JSON Schema or Lambda), <b>gradual rollouts</b>, and <b>automatic rollback</b> tied to CloudWatch alarms.<br>
+Benefits: config changes don't require redeploying code, and the blast radius shrinks. Critical config like CDN fallback especially needs validation + gradual rollout.
+@@ 2874ecdbea
+Q: What are IAM's core concepts? What is the principle of least privilege?
+A:
+<ul><li>User, Group, <b>Role</b> (temporarily assumed by services/instances, STS temporary credentials), Policy (JSON: Effect/Action/Resource/Condition)</li>
+<li>Identity-based vs resource-based policies (e.g. S3 bucket policies)</li>
+<li>Explicit Deny wins</li></ul>
+Least privilege: grant only the minimum permissions a task needs. A Lambda execution role gets only the specific Actions on the DynamoDB tables it needs.
+@@ 2ffab9b0a5
+Q: What is S3's consistency model, and what are its common uses?
+A:
+Since December 2020, S3 provides <b>strong read-after-write consistency</b> for all operations.<br>
+Uses: static site/frontend hosting, data lakes, backups, logs. Storage classes: Standard, IA, Glacier; lifecycle policies; versioning; presigned URLs let clients upload directly.
+@@ 70611e71a2
+Q: How do you do observability (monitoring/logging/tracing) on AWS?
+A:
+<ul><li><b>CloudWatch Metrics</b>: latency p50/p99, error rate, throughput; alarms</li>
+<li><b>CloudWatch Logs</b>: structured logs (JSON), queried with Logs Insights</li>
+<li><b>X-Ray</b>: distributed tracing to find slow downstreams</li></ul>
+The three pillars: metrics, logs, traces. Watch <b>tail latency</b> (p99), not just the average.
+@@ 6ac7d9e666
+Q: What is a RESTful API, and what are its design principles?
+A:
+Resources are noun URLs and HTTP methods express operations: <code>GET /services/{id}</code>, <code>POST /services</code>, <code>PATCH</code>, <code>DELETE</code>.<br>
+Principles: stateless, uniform interface, correct status codes, pagination (cursor beats offset), query parameters for filtering/sorting, versioning (<code>/v1/</code>), idempotency, consistent error format.
+@@ 20dac0e612
+Q: REST vs gRPC?
+A:
+<table><tr><th></th><th>REST</th><th>gRPC</th></tr>
+<tr><td>Protocol</td><td>HTTP/1.1 or 2</td><td>HTTP/2</td></tr>
+<tr><td>Format</td><td>JSON (text)</td><td>Protobuf (binary, smaller and faster)</td></tr>
+<tr><td>Contract</td><td>OpenAPI (optional)</td><td>Strongly typed .proto with code generation</td></tr>
+<tr><td>Streaming</td><td>Limited (SSE/WebSocket)</td><td>Native unidirectional/bidirectional streams</td></tr>
+<tr><td>Use cases</td><td>Public APIs, browsers</td><td>Internal microservice communication</td></tr></table>
+@@ 7f94cbc581
+Q: What are FastAPI's core features? Why is it fast?
+A:
+<ul><li>Built on <b>Starlette</b> (ASGI) + <b>Pydantic</b> (validation/serialization)</li>
+<li>Uses type hints to automatically parse and validate requests and generate <b>OpenAPI/Swagger</b> docs</li>
+<li>Native async support; <code>def</code> routes run in a thread pool automatically</li>
+<li><b>Dependency injection</b> with <code>Depends()</code>: database sessions, auth, reusable logic (yield handles cleanup)</li>
+<li>Runs on ASGI servers such as Uvicorn</li></ul>
+@@ 4574f3f11c
+Q: What is the difference between WSGI and ASGI?
+A:
+<ul><li><b>WSGI</b>: synchronous interface; each request occupies a thread/process (Flask, traditional Django, Gunicorn)</li>
+<li><b>ASGI</b>: asynchronous interface; supports async, WebSocket, long-lived connections and HTTP/2 (FastAPI, Starlette, Django Channels; Uvicorn)</li></ul>
+Production deployments often use Gunicorn to manage multiple Uvicorn worker processes (to use multiple cores).
+@@ 8c9cc2c9db
+Q: How do you implement streaming output for an LLM application?
+A:
+The server uses <b>SSE (Server-Sent Events)</b> or WebSocket and pushes tokens as they are generated: in FastAPI, return a <code>StreamingResponse</code> wrapping an async generator <code>async def gen(): yield f"data: {token}\n\n"</code>.<br>
+Benefit: lower <b>perceived latency</b> (users see content right after TTFT). Watch out for: buffering and timeouts in proxies/load balancers, and cancelling generation when the client disconnects.
+@@ 4bf7df976c
+Q: How do you test Python backend code? Unit tests vs integration tests?
+A:
+<ul><li><b>Unit tests</b>: isolate a single function/class and mock external dependencies (<code>unittest.mock.patch</code>, <code>moto</code> for AWS)</li>
+<li><b>Integration tests</b>: interactions between real dependencies (databases, downstream services, beta environments)</li>
+<li>End-to-end tests</li></ul>
+pytest: fixtures (scopes, yield cleanup), <code>parametrize</code>, <code>pytest-asyncio</code>; FastAPI uses <code>TestClient</code>. Test pyramid: many unit tests, few E2E tests.
+@@ 73c0791f58
+Q: What is CI/CD? What does a typical deployment pipeline look like?
+A:
+<b>CI</b>: automatically build + test + lint on every commit. <b>CD</b>: automatically deploy to each environment.<br>
+Typical pipeline: code review → build → unit tests → deploy to beta → integration tests → gamma/staging → <b>canary/staged</b> production rollout (by region/one-box) → monitoring alarms with automatic rollback.<br>
+Deployment strategies: rolling, blue-green, canary.
+@@ 056fa97449
+Q: What are Docker images and containers? What are tips for optimizing a Dockerfile?
+A:
+Image = read-only layered filesystem; container = image + writable layer + isolated process (namespaces isolate, cgroups limit resources). Unlike VMs, containers share the host kernel.<br>
+Optimizations:<ul><li>Small base images (python:3.x-slim)</li><li><b>Use the layer cache</b>: COPY requirements.txt and install dependencies first, then COPY the source</li><li>Multi-stage builds</li><li>.dockerignore</li><li>Run as a non-root user</li></ul>
+@@ adf42e01d1
+Q: Git: merge vs rebase?
+A:
+<ul><li><b>merge</b>: creates a merge commit, keeps full history, non-destructive</li>
+<li><b>rebase</b>: "replays" commits on top of the target branch for linear history; rewrites commit hashes</li></ul>
+Rule: <b>don't rebase shared branches that have been pushed</b>. A common flow: <code>git rebase main</code> on your local feature branch to keep it tidy, then merge the PR (squash or merge).
+@@ 6d70e67169
+Q: What is ReAct? What does an agent's tool-use loop look like?
+A:
+ReAct = <b>Re</b>asoning + <b>Act</b>ing: the model alternates between reasoning (Thought) and actions (Action / tool calls), observes the tool results (Observation) and continues until it gives a final answer.<br>
+<pre><code>while not done and steps &lt; MAX:
+    resp = llm(messages, tools)
+    if resp.tool_calls:
+        for call in resp.tool_calls:
+            result = run_tool(call)      # validate args, timeouts, permissions
+            messages.append(tool_result(result))
+    else:
+        done = True</code></pre>
+Engineering points: step limits, truncating tool results, returning errors as observations so the model can self-correct, logs/traces, human confirmation for sensitive operations.
+@@ 599d6d25ec
+Q: What is the difference between an agent and a fixed workflow? When do you use each?
+A:
+<ul><li><b>Workflow</b>: steps predefined in code (the LLM handles only some nodes); predictable, easy to test, cost-controlled</li>
+<li><b>Agent</b>: the LLM dynamically decides which tools to call and how many steps to take; flexible but highly uncertain</li></ul>
+Rule: <b>don't use an agent if a simple workflow will do</b>; reach for an agent when the task's path is unpredictable and needs exploration. Production systems often mix them: a deterministic outer flow + local agents, backed by validators/tests.
+@@ aaecf01860
+Q: What is RAG, and what are its key stages?
+A:
+Retrieval-augmented generation: first <b>retrieve</b> relevant documents from a knowledge base, put them in the prompt, then let the LLM generate, which reduces hallucinations and makes current/private knowledge usable.<br>
+Flow: document chunking → embedding → vector store (ANN index such as HNSW) → retrieve top-k at query time (optionally hybrid with BM25 keyword search) → rerank → build the prompt → generate + cite sources.<br>
+Evaluation: retrieval recall/precision, answer faithfulness.
+@@ ac9232130d
+Q: How do you evaluate and improve the reliability of LLM output (such as config files)?
+A:
+<ul><li><b>Structured output</b>: constrain the format with JSON Schema / Pydantic</li>
+<li><b>Deterministic validators</b>: schema checks, lint, unit/integration tests</li>
+<li><b>Feedback loop</b>: return validation/test failures to the model and retry (self-correction)</li>
+<li>Few-shot: retrieve similar existing correct examples</li>
+<li>Eval set + regression tests</li>
+<li>Human-in-the-loop: human code review as the final gate</li></ul>
+@@ 017be36db4
+Q: How is Transformer self-attention computed?
+A:
+<code>Attention(Q,K,V) = softmax(QKᵀ / √d_k) V</code><br>
+<ul><li>Q/K/V are linear projections of the input</li><li>Dividing by √d_k keeps large dot products from pushing softmax into vanishing gradients</li><li><b>Multi-head</b>: multiple projections in parallel capture relationships in different subspaces</li><li>The decoder uses a <b>causal mask</b> so it only sees earlier tokens</li></ul>
+Complexity is O(n²) in sequence length.
+@@ 102096e3fe
+Q: What is a KV cache, and why does it speed up inference?
+A:
+In autoregressive generation, each new token must attend to all previous tokens. The <b>K and V of previous tokens never change</b>, so they are cached and each new step computes Q/K/V only for the new token.<br>
+Effect: per-step computation drops from projecting O(n) tokens to O(1), but <b>GPU memory use</b> grows linearly with sequence length and batch:<br>
+<code>2 × layers × KV heads × head_dim × sequence length × bytes</code>.<br>
+Optimizations: GQA/MQA (fewer KV heads), quantization, PagedAttention, prefix caching, offloading to CPU.
+@@ e5d2fb4341
+Q: What is the difference between the prefill and decode phases of LLM inference?
+A:
+<ul><li><b>Prefill</b>: processes the whole prompt at once in parallel; <b>compute-bound</b>; determines <b>TTFT</b> (time to first token)</li>
+<li><b>Decode</b>: generates tokens one at a time, reading all weights and the KV cache at each step; <b>memory-bound</b>; determines <b>TPOT/ITL</b> (time per token)</li></ul>
+Optimizations: continuous batching, chunked prefill (splitting long prefills to mix with decode), disaggregated prefill/decode deployment.
+@@ 9fd8593b9d
+Q: What problem does vLLM's PagedAttention solve?
+A:
+The traditional approach preallocates contiguous KV memory for each request at maximum length → heavy <b>internal/external fragmentation</b> and waste.<br>
+PagedAttention borrows OS virtual memory paging: the KV cache is split into fixed-size <b>blocks</b>, a block table maps logical to physical blocks, and blocks are allocated on demand.<br>
+Benefits: nearly zero waste → larger batches → higher throughput; supports block-level sharing (parallel sampling, beam search, <b>prefix sharing</b>, with reference counting + copy-on-write).
+@@ 8227a2897f
+Q: What is prefix caching? Why can TTFT stay high even with a high cache hit rate?
+A:
+<b>Prefix caching</b>: when requests share a prefix (system prompt, multi-turn history, few-shot examples), reuse the already computed KV blocks (vLLM matches blocks by content hash) and skip that part of prefill.<br>
+Possible reasons for high TTFT despite a high hit rate:<ul>
+<li><b>Queueing delay</b>: cache-aware routing concentrates requests on a few instances → uneven load and longer queues</li>
+<li>The unmatched part (the suffix) is still long, so prefill is still heavy</li>
+<li>Scheduling: blocked by large decode batches or other long prefills</li>
+<li>Transfer overhead when loading KV from CPU/remote storage</li>
+<li>Hit rates measured per token vs per request differ and can mask the long tail</li></ul>
+Key point: TTFT = queueing + scheduling + prefill (+ transfer); measure each part separately.
+@@ 84a28ce725
+Q: What are the KV cache eviction policies? What are the limits of LRU in LLM serving?
+A:
+vLLM evicts free blocks with reference count 0 using an <b>LRU</b>-style policy (on equal timestamps, it evicts the block at the end of the prefix chain first).<br>
+Limits:<ul><li>Ignores <b>recomputation cost</b> (evicting a long prefix costs more)</li><li>Ignores the likelihood of future reuse (e.g. a system prompt shared by most requests)</li><li>Prefix-tree structure: evicting a middle block invalidates the blocks after it</li></ul>
+Alternatives: LFU, cost-weighted policies (GDSF-style), prefix-tree-aware eviction (SGLang RadixAttention evicts leaf nodes), and an offline <b>Belady/OPT oracle</b> as an upper bound for comparison.
+@@ f83a7bd88a
+Q: What is continuous batching?
+A:
+Also called iteration-level scheduling. Traditional static batching waits for the whole batch to finish before accepting new requests, so short requests wait for long ones.<br>
+Continuous batching removes finished requests and adds new ones at <b>every decode iteration</b>, greatly improving GPU utilization and throughput (proposed in the Orca paper, adopted by vLLM/TGI).
+@@ 696eb730e8
+Q: LLM sampling: what are temperature, top-k and top-p?
+A:
+<ul><li><b>Temperature</b>: <code>softmax(logits / T)</code>. T&lt;1 sharpens the distribution (more deterministic), T&gt;1 flattens it (more random), T→0 approaches greedy</li>
+<li><b>Top-k</b>: keep only the k most probable tokens, renormalize, then sample</li>
+<li><b>Top-p (nucleus)</b>: accumulate probabilities in descending order and keep the smallest set with cumulative probability ≥ p; the candidate count adapts to the distribution</li></ul>
+Common order: logits → temperature → top-k → top-p → sample.<br>
+<b>Inverse-CDF sampling</b>: compute the cumulative distribution, draw u~U(0,1), and find the first token with CDF ≥ u (binary search works).
+@@ 6f70f1829a
+Q: What is the difference between greedy, beam search and sampling decoding?
+A:
+<ul><li><b>Greedy</b>: takes the most probable token at each step; deterministic but prone to repetition and local optima</li>
+<li><b>Beam search</b>: keeps the B best partial sequences; suits tasks with a "right answer" such as translation/summarization; dull for open-ended generation</li>
+<li><b>Sampling</b> (temperature/top-k/top-p): good diversity; suits conversation and creative writing</li></ul>
+Also: repetition penalty, speculative decoding (a small model drafts, a large model verifies; speeds things up without changing the distribution).
+@@ 45e0225115
+Q: What are the key metrics of LLM serving?
+A:
+<ul><li><b>TTFT</b> (Time To First Token): key to the interactive experience</li>
+<li><b>TPOT / ITL</b>: the gap between output tokens</li>
+<li>End-to-end latency = TTFT + TPOT × (output length − 1)</li>
+<li><b>Throughput</b>: tokens/s, requests/s</li>
+<li><b>Goodput</b>: throughput that meets the SLO</li>
+<li>KV cache hit rate, GPU utilization, GPU memory use</li></ul>
+Look at the p50/p99 distribution, not just the mean.
+@@ f578ddb4a6
+Q: What is discrete-event simulation? Why use it to study serving systems?
+A:
+System state changes only at discrete <b>events</b> (request arrival, prefill done, decode done, eviction). A <b>priority queue</b> ordered by time (Python heapq) yields the next event; the simulation clock advances, the event is handled, and new events are produced.<br>
+Advantages: rapidly sweeps many parameter combinations (cache capacity, routing policy, load) without GPUs, and it's reproducible.<br>
+Key point: <b>calibrate</b> the latency model with real measurements (prefill time vs token count) and cross-validate against real vLLM test results.
+@@ 90ec8926ed
+Q: What are common prompt engineering techniques?
+A:
+Clear, specific instructions; role/context; <b>few-shot examples</b>; chain of thought (let the model reason first); structured output (XML tags / JSON schema); long documents first, question last; tool descriptions and when to use them; explicit constraints and what to do on failure.<br>
+At the system level: version your prompts and regression-test them with an eval set.
+@@ 95dece029d
+Q: [Resume deep dive] Tell me about your CDN fallback onboarding agent: how did it cut ~14 days to ~2 hours?
+A:
+Answer framework (STAR + technical detail):<ul>
+<li><b>Background</b>: what were the original steps? Where did the time go (finding docs, understanding requirements, writing config, rounds of review)?</li>
+<li><b>Architecture</b>: the ReAct loop and its tools (retrieve docs, search code examples, generate config, validate, create a CR)</li>
+<li><b>Reliability</b>: how you prevent hallucinations (retrieving current requirements + validators + integration tests + human review)</li>
+<li><b>Measurement</b>: how were 14 days and 2 hours measured? End to end, or engineer time?</li>
+<li><b>Failure cases</b>: when does the agent go wrong, and how do you handle it?</li></ul>
+Have a specific bug/challenge story ready.
+@@ aa59d42068
+Q: [Resume deep dive] How did you design your "self-improving loop"? Could it loop forever or keep getting worse?
+A:
+You should be able to explain:<ul>
+<li>How test output (failures, diffs, logs) is <b>structured</b> and fed back to the agent</li>
+<li><b>Stop conditions</b>: maximum iterations, all tests passing, no improvement across rounds</li>
+<li>Preventing regressions: keep the best version so far, run the full test suite every round (so fixing A doesn't break B)</li>
+<li>Context management: how to truncate/summarize overly long failure logs</li>
+<li>Cost and latency control</li></ul>
+@@ dd19370d5b
+Q: [Resume deep dive] ECS + Lambda precomputation pipeline: how exactly did you go from 1000ms to 99ms?
+A:
+Prepare:<ul>
+<li>The original bottleneck: each request fanned out to multiple service APIs (serial or parallel? tail latency? rate limits?)</li>
+<li>The new architecture: scheduled trigger (EventBridge?) → ECS tasks fetch in batches / Lambda processes → write to DynamoDB (table design, PK/SK) → API reads the table</li>
+<li>Why both ECS and Lambda (task duration, concurrency)</li>
+<li>How <b>data freshness</b> is ensured: refresh frequency? Failure retries?</li>
+<li>Is 99ms p50 or p99? How was it measured?</li></ul>
+@@ c549c870eb
+Q: [Resume deep dive] KV-cache research: you observed "high hit rate but still high TTFT". What were your hypotheses and experiment design?
+A:
+Prepare:<ul>
+<li>Experiment setup: A30, Qwen3-4B, vLLM version, how load was generated (arrival rate, prompt length distribution)</li>
+<li>How you measured hit rate and TTFT, and how you broke TTFT down (queueing / prefill / scheduling)</li>
+<li>What trace analysis found (degree of prefix overlap, multi-turn conversation structure)</li>
+<li>Which routing policies you compared (round-robin, least-loaded, prefix-aware/consistent hashing) and the tradeoffs</li>
+<li>How the simulator was calibrated and validated against the real system</li>
+<li>What the "constrained CPU oracle" is: an upper-bound reference for eviction policies</li></ul>
+@@ 0ee919fecd
+Q: [Resume deep dive] LLM Decoding Visualizer: how did you implement top-p, and what are the edge cases?
+A:
+<pre><code>import torch
+def sample(logits, T=1.0, k=0, p=1.0):
+    if T == 0: return logits.argmax()
+    logits = logits / T
+    if k &gt; 0:
+        kth = torch.topk(logits, k).values[-1]
+        logits[logits &lt; kth] = -float('inf')
+    probs = torch.softmax(logits, -1)
+    if p &lt; 1.0:
+        sp, idx = probs.sort(descending=True)
+        cum = sp.cumsum(-1)
+        mask = cum - sp &gt; p        # guarantees at least one token is kept
+        sp[mask] = 0
+        probs = torch.zeros_like(probs).scatter(0, idx, sp)
+        probs /= probs.sum()
+    cdf = probs.cumsum(-1)        # inverse-CDF
+    u = torch.rand(1)
+    return torch.searchsorted(cdf, u)</code></pre>
+Edge cases: T=0, k larger than the vocabulary, keeping at least 1 token, numerical stability (subtract the max before softmax), and floating-point error leaving the end of the CDF &lt; 1.
+@@ c614e38c5d
+Q: [Behavioral] What stories should you prepare for Amazon's Leadership Principles?
+A:
+Prepare at least 6–8 stories, each mapping to several LPs:<ul>
+<li><b>Customer Obsession</b>: the agent helping customers onboard, UX research</li>
+<li><b>Invent and Simplify</b>: 14 days → 2 hours</li>
+<li><b>Dive Deep</b>: investigating the KV-cache behavior, latency optimization</li>
+<li><b>Deliver Results</b>: delivering the internship on schedule</li>
+<li><b>Bias for Action</b>, <b>Ownership</b>, <b>Learn and Be Curious</b>, <b>Disagree and Commit</b>, <b>Earn Trust</b></li></ul>
+Use the STAR structure, <b>emphasize what "I" did</b>, quantify results, and prepare stories about failure and conflict.
+@@ 26d429f1c7
+Q: [Behavioral] Tell me about your biggest technical challenge or failure.
+A:
+Template:<ol><li><b>Situation</b>: background (one or two sentences)</li><li><b>Task</b>: your responsibility and goal</li><li><b>Action</b>: what you specifically did (60% of the answer), including how you found the problem, which options you considered, and why you chose this one</li><li><b>Result</b>: quantified outcome + <b>what you learned</b> and how you improved afterward</li></ol>
+For failure questions: don't pick a fake failure. Admit the problem and focus on reflection and what changed afterward.
+@@ dd399ceebe
+Q: [Resume deep dive] Why choose DynamoDB rather than a relational database to store deployment metrics?
+A:
+Angles to cover:<ul><li>Access patterns are fixed and known (query by service/tier/stage), and KV read latency stays steady at milliseconds</li><li>Serverless and auto-scaling, and it pairs with Lambda without managing a connection pool</li><li>No need for complex joins/transactions</li><li>It is the team's existing stack</li></ul>
+Also state the tradeoffs: weak flexible querying (new access patterns need a GSI), expensive scans, a 400 KB per-item limit. For ad-hoc analysis, export to S3 + Athena.

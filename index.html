@@ -1,0 +1,1059 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>面试八股 · 记忆卡</title>
+<style>
+:root {
+  --bg: #f5f6f8; --card: #ffffff; --ink: #1d2330; --muted: #667085; --line: #dde1e8; --soft: #f0f2f5;
+  --accent: #3b5bdb; --accent-soft: #edf1fd; --chart: #3b5bdb;
+  --ok: #2b8a3e; --ok-soft: #e9f8ec; --bad: #c92a2a; --bad-soft: #fdecec;
+  --key: #1864ab; --key-soft: #eaf3fb; --note: #b35c00; --note-soft: #fff3e3; --star: #f59f00;
+}
+:root[data-theme="dark"] {
+  --bg: #14161b; --card: #1c1f26; --ink: #e6e8ec; --muted: #9aa3b2; --line: #2e333d; --soft: #232731;
+  --accent: #7c95f5; --accent-soft: #232b45; --chart: #6d88ee;
+  --ok: #5cc27a; --ok-soft: #17301f; --bad: #f07171; --bad-soft: #3a1c1f;
+  --key: #6fb1ea; --key-soft: #182a3b; --note: #f0a64a; --note-soft: #33261a; --star: #ffc53d;
+}
+* { box-sizing: border-box; }
+html, body { margin: 0; background: var(--bg); color: var(--ink); }
+body { font: 15px/1.6 -apple-system, "PingFang SC", "Helvetica Neue", Helvetica, Arial, sans-serif; }
+button, select, input { font: inherit; color: inherit; }
+[hidden] { display: none !important; }
+.wrap { max-width: 960px; margin: 0 auto; padding: 16px 16px 40px; }
+
+header { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; flex-wrap: wrap; margin-bottom: 12px; }
+header h1 { font-size: 20px; margin: 0; letter-spacing: -0.2px; }
+header .overall { color: var(--muted); font-size: 13px; }
+.tabs { display: flex; gap: 4px; margin-bottom: 14px; border-bottom: 1px solid var(--line); overflow-x: auto; }
+.tab { background: none; border: none; border-bottom: 2px solid transparent; padding: 6px 12px; margin-bottom: -1px; cursor: pointer; color: var(--muted); font-weight: 600; white-space: nowrap; }
+.tab[aria-selected="true"] { color: var(--accent); border-bottom-color: var(--accent); }
+
+.card { background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 18px 20px; }
+.card + .card { margin-top: 12px; }
+.card h2 { font-size: 13px; margin: 0 0 10px; color: var(--muted); font-weight: 700; }
+.btn { border: 1px solid var(--line); background: var(--card); border-radius: 8px; padding: 6px 13px; cursor: pointer; }
+.btn:hover:not(:disabled) { border-color: var(--accent); }
+.btn.primary { background: var(--accent); border-color: var(--accent); color: #fff; font-weight: 600; }
+:root[data-theme="dark"] .btn.primary { color: #10131a; }
+.btn.ghost { background: transparent; }
+.btn.small { font-size: 12px; padding: 3px 9px; }
+.btn:disabled { opacity: .45; cursor: default; }
+.muted { color: var(--muted); }
+.hint { color: var(--muted); font-size: 12px; }
+kbd { font: 11px Menlo, monospace; border: 1px solid var(--line); border-bottom-width: 2px; border-radius: 4px; padding: 0 4px; background: var(--soft); }
+.warn { background: var(--bad-soft); color: var(--bad); border-radius: 8px; padding: 8px 12px; margin-bottom: 12px; font-size: 13px; }
+
+/* counts, in Anki's colors: new / learning / review */
+.n-new { color: var(--key); } .n-lrn { color: var(--bad); } .n-rev { color: var(--ok); }
+.counts { display: inline-flex; gap: 12px; font-variant-numeric: tabular-nums; font-weight: 600; }
+.counts .on { text-decoration: underline; text-underline-offset: 3px; text-decoration-thickness: 2px; }
+.dim { color: var(--muted); font-weight: 400; }
+
+/* home */
+.today { display: flex; align-items: center; gap: 24px; flex-wrap: wrap; }
+.today .big { display: flex; gap: 28px; }
+.today .big b { display: block; font-size: 28px; line-height: 1.15; font-variant-numeric: tabular-nums; }
+.today .big span { font-size: 12px; color: var(--muted); }
+.today .act { margin-left: auto; display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+.today .start { font-size: 16px; padding: 8px 22px; }
+.today + .sub { margin-top: 10px; }
+.more { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 12px; }
+.decks { margin: 0; padding: 0; list-style: none; }
+.drow { display: flex; align-items: center; gap: 8px; padding: 6px 4px; border-top: 1px solid var(--line); }
+.decks > li:first-child > .drow { border-top: none; }
+.drow.child { padding-left: 30px; font-size: 14px; }
+.drow .name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.drow.top .name { font-weight: 600; }
+.drow .num { display: flex; gap: 10px; font-size: 13px; font-variant-numeric: tabular-nums; }
+.drow .num span { min-width: 34px; text-align: right; }
+.drow .num .zero { color: var(--line); }
+.caret { background: none; border: none; cursor: pointer; width: 20px; padding: 0; color: var(--muted); }
+.drow input { margin: 0; }
+.dhead { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; }
+.dhead h2 { margin: 0; flex: 1; }
+.dhead .num { display: flex; gap: 10px; font-size: 12px; color: var(--muted); margin-right: 4px; }
+.dhead .num span { min-width: 34px; text-align: right; }
+.drow .go { opacity: 0; }
+.drow:hover .go, .drow .go:focus { opacity: 1; }
+
+/* study */
+.topbar { display: flex; align-items: center; gap: 12px; margin-bottom: 12px; flex-wrap: wrap; }
+.topbar .grow { flex: 1; }
+.seg { display: inline-flex; border: 1px solid var(--line); border-radius: 7px; overflow: hidden; }
+.seg button { background: var(--card); border: none; padding: 2px 10px; font-size: 12px; cursor: pointer; color: var(--muted); }
+.seg button + button { border-left: 1px solid var(--line); }
+.seg button[aria-pressed="true"] { background: var(--accent-soft); color: var(--accent); font-weight: 600; }
+.fc { min-height: 240px; padding-bottom: 22px; }
+.meta { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; font-size: 13px; color: var(--muted); margin-bottom: 12px; }
+.tag { font-weight: 700; border: 1px solid currentColor; border-radius: 4px; padding: 0 6px; font-size: 12px; }
+.meta .right { margin-left: auto; display: flex; gap: 8px; align-items: center; }
+.star { background: none; border: none; cursor: pointer; font-size: 18px; line-height: 1; color: var(--muted); padding: 0 2px; }
+.star[aria-pressed="true"] { color: var(--star); }
+.qtext { font-size: 19px; line-height: 1.5; font-weight: 600; margin: 0; overflow-wrap: anywhere; }
+.qen { font-size: 15px; line-height: 1.5; color: var(--muted); margin: 6px 0 0; font-weight: 400; overflow-wrap: anywhere; }
+hr.split { border: none; border-top: 1px solid var(--line); margin: 16px 0; }
+.lang { font-size: 11px; font-weight: 800; letter-spacing: .5px; color: var(--muted); margin: 16px 0 4px; }
+.lang:first-child { margin-top: 0; }
+.ans { overflow-wrap: anywhere; line-height: 1.7; }
+.ans p { margin: 0 0 8px; }
+.ans ul, .ans ol { margin: 6px 0 8px; padding-left: 22px; }
+.ans ul { list-style: disc; } .ans ol { list-style: decimal; } .ans ul ul { list-style: circle; }
+.ans li { margin: 2px 0; }
+.ans h1, .ans h2, .ans h3, .ans h4, .ans h5, .ans h6 { font-size: 15px; margin: 14px 0 6px; color: var(--ink); font-weight: 700; }
+.ans h1, .ans h2 { font-size: 16.5px; }
+.ans blockquote { margin: 6px 0; padding: 2px 10px; border-left: 3px solid var(--line); color: var(--muted); }
+.ans table { display: block; overflow-x: auto; border-collapse: collapse; margin: 8px 0; font-size: 14px; }
+.ans th, .ans td { border: 1px solid var(--line); padding: 3px 9px; text-align: left; }
+.ans thead th, .ans tr:first-child th { background: var(--soft); }
+pre { font: 13px/1.5 Menlo, "SF Mono", Consolas, monospace; background: var(--soft); border: 1px solid var(--line); border-radius: 6px; padding: 8px 10px; overflow-x: auto; margin: 8px 0; overflow-wrap: normal; }
+code { font: 13px Menlo, "SF Mono", Consolas, monospace; background: var(--soft); border: 1px solid var(--line); border-radius: 4px; padding: 0 4px; }
+pre code { background: none; border: none; padding: 0; }
+.qtext code, .qen code { font-size: .88em; font-weight: 500; }
+.ans a, .srcline a { color: var(--accent); }
+.by { font-size: 12px; color: var(--muted); margin: 14px 0 4px; padding-top: 8px; border-top: 1px dashed var(--line); }
+.ans > .by:first-child { margin-top: 0; padding-top: 0; border-top: none; }
+.noimg { display: inline-block; font-size: 12px; color: var(--muted); border: 1px dashed var(--line); border-radius: 5px; padding: 1px 8px; }
+.srcline { font-size: 12px; color: var(--muted); margin-top: 12px; }
+.noen { font-size: 12px; color: var(--muted); margin-top: 10px; }
+.memo { display: flex; gap: 14px; flex-wrap: wrap; margin-top: 14px; font-size: 12px; color: var(--muted); }
+.memo b { color: var(--ink); font-weight: 600; font-variant-numeric: tabular-nums; }
+
+/* the answer bar stays in reach however long the answer is */
+.bar { position: sticky; bottom: 0; background: var(--bg); padding: 10px 0 12px; margin-top: 2px; z-index: 5; }
+.flip { display: block; width: 100%; font-size: 16px; padding: 10px; }
+.flip kbd { color: var(--ink); margin-left: 4px; }
+.grades { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; }
+.grade { border: 1.5px solid var(--line); background: var(--card); border-radius: 10px; padding: 6px 4px 7px; cursor: pointer; line-height: 1.3; }
+.grade b { display: block; font-size: 15px; }
+.grade small { font-size: 12px; color: var(--muted); font-variant-numeric: tabular-nums; }
+.grade[data-r="1"] { border-color: var(--bad); } .grade[data-r="1"] b { color: var(--bad); }
+.grade[data-r="2"] { border-color: var(--note); } .grade[data-r="2"] b { color: var(--note); }
+.grade[data-r="3"] { border-color: var(--ok); } .grade[data-r="3"] b { color: var(--ok); }
+.grade[data-r="4"] { border-color: var(--key); } .grade[data-r="4"] b { color: var(--key); }
+.grade[data-r="1"]:hover { background: var(--bad-soft); } .grade[data-r="2"]:hover { background: var(--note-soft); }
+.grade[data-r="3"]:hover { background: var(--ok-soft); } .grade[data-r="4"]:hover { background: var(--key-soft); }
+.tools { display: flex; gap: 6px; flex-wrap: wrap; align-items: center; margin-top: 10px; }
+.tools .grow { flex: 1; }
+.done { text-align: center; padding: 44px 16px; }
+.done h3 { margin: 0 0 6px; font-size: 19px; }
+.done .more { justify-content: center; }
+
+/* notes */
+textarea { font: inherit; color: inherit; width: 100%; min-height: 64px; resize: none; overflow-y: hidden; background: var(--card); border: 1px solid var(--line); border-radius: 8px; padding: 8px 10px; line-height: 1.45; }
+textarea:focus, input[type="search"]:focus { outline: 2px solid var(--accent-soft); border-color: var(--accent); }
+details.mynote { margin-top: 14px; }
+details.mynote > summary { cursor: pointer; font-size: 13px; font-weight: 600; color: var(--accent); }
+.mynote .notehead { display: flex; justify-content: space-between; font-size: 12px; color: var(--muted); margin: 6px 0 4px; }
+.nimgs { display: flex; flex-direction: column; gap: 8px; }
+.nimgs:not(:empty) { margin-top: 8px; }
+.nimg { position: relative; margin: 0; width: fit-content; max-width: 100%; }
+.nimg img { display: block; max-width: 100%; height: auto; border: 1px solid var(--line); border-radius: 6px; background: #fff; cursor: zoom-in; }
+.nimg .x { position: absolute; top: 4px; right: 4px; width: 22px; height: 22px; padding: 0; border: none; border-radius: 50%; background: rgba(0,0,0,.6); color: #fff; font-size: 15px; line-height: 22px; cursor: pointer; }
+#lightbox { position: fixed; inset: 0; z-index: 50; display: flex; align-items: center; justify-content: center; padding: 16px; background: rgba(0,0,0,.8); cursor: zoom-out; }
+#lightbox img { max-width: 100%; max-height: 100%; }
+.ncard { margin-bottom: 12px; }
+.ncard .qtext { font-size: 16px; }
+.ncard details.reveal { margin: 8px 0; }
+details.reveal > summary { cursor: pointer; color: var(--accent); font-weight: 600; font-size: 13px; }
+.nfoot { display: flex; gap: 8px; align-items: center; margin-top: 8px; font-size: 12px; color: var(--muted); }
+.nfoot .grow { flex: 1; }
+
+/* browse */
+.bar-f { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-bottom: 12px; }
+.bar-f input[type="search"] { flex: 1 1 240px; background: var(--card); border: 1px solid var(--line); border-radius: 8px; padding: 6px 10px; }
+.bar-f select { background: var(--card); border: 1px solid var(--line); border-radius: 8px; padding: 6px 8px; max-width: 240px; }
+.blist { padding: 0; }
+.brow { border-top: 1px solid var(--line); }
+.brow:first-child { border-top: none; }
+.brow > summary { list-style: none; cursor: pointer; display: flex; gap: 10px; align-items: baseline; padding: 8px 14px; }
+.brow > summary::-webkit-details-marker { display: none; }
+.brow > summary:hover { background: var(--soft); }
+.brow .bq { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.brow .bm { font-size: 12px; color: var(--muted); white-space: nowrap; font-variant-numeric: tabular-nums; }
+.brow .inner { padding: 4px 14px 14px; }
+.brow .inner .qtext { font-size: 16px; }
+.brow .tools { margin-top: 12px; }
+.bcount { font-size: 12px; color: var(--muted); margin-bottom: 8px; }
+.empty { text-align: center; color: var(--muted); padding: 36px 10px; }
+
+/* stats */
+.tiles { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; }
+.tile { background: var(--card); border: 1px solid var(--line); border-radius: 10px; padding: 10px 14px; }
+.tile span { display: block; font-size: 12px; color: var(--muted); }
+.tile b { font-size: 22px; font-variant-numeric: tabular-nums; line-height: 1.3; }
+.chart { display: flex; align-items: flex-end; height: 150px; gap: 2px; border-bottom: 1px solid var(--line); padding-top: 18px; }
+.col { flex: 1; height: 100%; display: flex; flex-direction: column; justify-content: flex-end; align-items: center; position: relative; cursor: default; outline-offset: 1px; }
+.col:hover { background: var(--soft); border-radius: 4px 4px 0 0; }
+.col i { display: block; width: 100%; max-width: 24px; background: var(--chart); border-radius: 4px 4px 0 0; }
+.col em { position: absolute; font: 600 11px/1 -apple-system, sans-serif; color: var(--ink); font-variant-numeric: tabular-nums; transform: translateY(-14px); }
+.xlabels { display: flex; gap: 2px; font-size: 11px; color: var(--muted); margin-top: 4px; }
+.xlabels span { flex: 1; text-align: center; min-width: 0; white-space: nowrap; }
+#tip { position: fixed; z-index: 40; pointer-events: none; background: var(--ink); color: var(--bg); font-size: 12px; border-radius: 6px; padding: 3px 8px; white-space: nowrap; }
+details.tbl { margin-top: 10px; font-size: 13px; }
+details.tbl summary { cursor: pointer; color: var(--muted); font-size: 12px; }
+details.tbl table { border-collapse: collapse; margin-top: 6px; }
+details.tbl td, details.tbl th { border: 1px solid var(--line); padding: 1px 10px; text-align: left; font-weight: 400; }
+
+/* settings */
+.set { display: flex; align-items: center; gap: 12px; padding: 9px 0; border-top: 1px solid var(--line); flex-wrap: wrap; }
+.set:first-of-type { border-top: none; }
+.set label { flex: 1 1 260px; }
+.set label small { display: block; color: var(--muted); font-size: 12px; }
+.set input[type="number"], .set select { background: var(--soft); border: 1px solid var(--line); border-radius: 7px; padding: 4px 8px; }
+.set input[type="number"] { width: 84px; }
+.ladder { font-size: 13px; margin: 8px 0 0; color: var(--muted); }
+.ladder b { color: var(--ink); font-weight: 600; }
+.acts { display: flex; gap: 8px; flex-wrap: wrap; }
+
+@media (max-width: 600px) {
+  .wrap { padding: 12px 10px 28px; } .card { padding: 14px; }
+  .drow .num { gap: 4px; } .drow .num span { min-width: 26px; } .dhead .num { gap: 4px; } .dhead .num span { min-width: 26px; }
+  .drow .go { display: none; } .today .act { margin-left: 0; } .tiles { grid-template-columns: repeat(2, 1fr); }
+}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1>面试八股 · 记忆卡</h1>
+    <div class="overall"><span id="overall"></span> <button class="btn ghost small" id="theme" title="切换深色模式" style="margin-left:8px">☾</button></div>
+  </header>
+  <div class="warn" id="saveWarn" hidden>进度保存失败（浏览器存储不可用或已满）。请先到「设置」导出进度。</div>
+  <nav class="tabs" role="tablist">
+    <button class="tab" role="tab" data-tab="study">学习</button>
+    <button class="tab" role="tab" data-tab="browse">浏览</button>
+    <button class="tab" role="tab" data-tab="notes" id="tabNotes">笔记</button>
+    <button class="tab" role="tab" data-tab="stats">统计</button>
+    <button class="tab" role="tab" data-tab="settings">设置</button>
+  </nav>
+
+  <section id="v-study"></section>
+
+  <section id="v-browse" hidden>
+    <div class="bar-f">
+      <input type="search" id="bSearch" placeholder="搜索题目、答案（中英文都能搜）…" aria-label="搜索卡片">
+      <select id="bDeck" aria-label="牌组"></select>
+      <select id="bState" aria-label="状态">
+        <option value="all">全部状态</option><option value="new">新卡</option><option value="lrn">学习中</option>
+        <option value="rev">复习中</option><option value="due">今日到期</option><option value="star">已标星</option>
+        <option value="susp">已暂停</option><option value="en">有英文解析</option>
+      </select>
+      <select id="bSort" aria-label="排序">
+        <option value="deck">按牌组顺序</option><option value="weak">记忆保留最低优先</option>
+      </select>
+    </div>
+    <div class="bcount" id="bCount"></div>
+    <div class="card blist" id="bList"></div>
+    <div class="more" style="justify-content:center"><button class="btn" id="bMore" hidden>显示更多</button></div>
+  </section>
+
+  <section id="v-notes" hidden>
+    <div class="bar-f">
+      <input type="search" id="nSearch" placeholder="搜索笔记和题目…" aria-label="搜索笔记">
+      <select id="nSort" aria-label="笔记排序"><option value="deck">按牌组顺序</option><option value="recent">最近编辑</option></select>
+      <button class="btn" id="nExport" title="把所有笔记导出成文本文件">导出 .txt</button>
+    </div>
+    <div id="nList"></div>
+  </section>
+
+  <section id="v-stats" hidden></section>
+
+  <section id="v-settings" hidden>
+    <div class="card">
+      <h2>学习节奏</h2>
+      <div class="set"><label for="sNew">每天新卡数<small>达到后不再出新卡；学完页面可以随时再加</small></label><input type="number" id="sNew" min="0" max="999"></div>
+      <div class="set"><label for="sRev">每天复习上限<small>只是软上限，超出的卡片顺延，可以随时继续</small></label><input type="number" id="sRev" min="0" max="9999"></div>
+      <div class="set"><label for="sTarget">复习强度<small>记忆保留率跌到这个水平时安排复习</small></label>
+        <select id="sTarget"><option value="0.8">轻松（80%，复习最少）</option><option value="0.9">标准（90%）</option><option value="0.95">冲刺（95%，面试前用）</option></select></div>
+      <div class="set"><label for="sOrder">新卡顺序<small>顺序适合按章节学，随机适合混合练习</small></label>
+        <select id="sOrder"><option value="deck">按牌组顺序</option><option value="random">随机</option></select></div>
+      <p class="ladder" id="ladder"></p>
+    </div>
+    <div class="card">
+      <h2>进度备份</h2>
+      <p class="hint" style="margin:0 0 10px">进度只存在当前浏览器里。建议定期导出，备份包含学习进度、标星和笔记文字，不含笔记里的图片。</p>
+      <div class="acts">
+        <button class="btn" id="exportBtn">导出进度</button>
+        <button class="btn" id="importBtn">导入进度</button>
+        <input type="file" id="importFile" accept="application/json,.json" hidden>
+      </div>
+    </div>
+    <div class="card">
+      <h2>重置</h2>
+      <p class="hint" style="margin:0 0 10px">重置只清除学习进度。标星和笔记都会保留。</p>
+      <div class="acts">
+        <button class="btn" id="resetSel">重置已勾选牌组</button>
+        <button class="btn" id="resetAll">重置全部进度</button>
+      </div>
+    </div>
+  </section>
+</div>
+<div id="lightbox" hidden><img alt="笔记图片放大"></div>
+<div id="tip" hidden></div>
+
+<script src="srs.js"></script>
+<script src="cards.js"></script>
+<script>
+(() => {
+  const D = window.DECKS, C = window.CARDS, L = window.SRS;
+  const KEY = "interview-anki-v1";
+  const $ = (id) => document.getElementById(id);
+  const esc = (s) => String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+  const plain = (h) => h.replace(/<[^>]+>/g, " ").replace(/&lt;/g, "<").replace(/&gt;/g, ">").replace(/&amp;/g, "&").replace(/\s+/g, " ").trim();
+  const byId = new Map(C.map(c => [c.id, c]));
+  const order = new Map(C.map((c, i) => [c.id, i]));
+  const TOPS = [...new Set(D.map(d => d.top))];
+  const deckIdx = new Map(D.map((d, i) => [d.id, i]));
+
+  // ---------- state ----------
+  // cards: id -> scheduler record; days: dayNo -> daily counters; bury: id -> dayNo; susp/stars: id -> true; notes: id -> {text, imgs, t}
+  const blank = () => ({ cards: {}, days: {}, bury: {}, susp: {}, stars: {}, notes: {}, prefs: {} });
+  let state = blank();
+  try { const s = JSON.parse(localStorage.getItem(KEY)); if (s) state = Object.assign(blank(), s); } catch (e) {}
+  const save = () => {
+    try { localStorage.setItem(KEY, JSON.stringify(state)); $("saveWarn").hidden = true; }
+    catch (e) { $("saveWarn").hidden = false; }
+  };
+  // Your own decks are the default set; the large legacy deck is opt-in.
+  const defaultSel = D.filter(d => d.top !== "面试八股文").map(d => d.id);
+  const prefs = Object.assign({ tab: "study", theme: "light", lang: "both", newPerDay: 20, revPerDay: 200, target: 0.9,
+    newOrder: "deck", sel: defaultSel, open: [] }, state.prefs);
+  state.prefs = prefs;
+  const persist = () => save();
+
+  const now = () => Date.now();
+  const rec = (id) => state.cards[id];
+  const today = () => {
+    const k = L.dayNo(now());
+    return state.days[k] || (state.days[k] = { n: 0, r: 0, ok: 0, l: 0, ms: 0, xn: 0, xr: 0 });
+  };
+  const when = (t) => new Date(t).toLocaleString("zh-CN", { month: "numeric", day: "numeric", hour: "2-digit", minute: "2-digit" });
+  const isBuried = (id) => state.bury[id] === L.dayNo(now());
+  const avail = (id) => !state.susp[id] && !isBuried(id);
+
+  // ---------- scheduling queries ----------
+  const scopeOf = (ids) => new Set(ids.map(i => deckIdx.get(i)).filter(i => i !== undefined));
+  const inScope = (c, scope) => c.d.some(i => scope.has(i));
+  const newSort = (a, b) => prefs.newOrder === "random" ? (a.id < b.id ? -1 : 1) : order.get(a.id) - order.get(b.id);
+
+  function pools(scope) {
+    const t = now(), lrn = [], rev = [], fresh = [];
+    for (const c of C) {
+      if (!inScope(c, scope) || !avail(c.id)) continue;
+      const r = rec(c.id);
+      if (L.isNew(r)) fresh.push(c);
+      else if (L.isLearning(r)) lrn.push(c);
+      else if (L.isDueToday(r, t, prefs.target)) rev.push(c);
+    }
+    fresh.sort(newSort);
+    lrn.sort((a, b) => rec(a.id).due - rec(b.id).due);
+    // Most-forgotten first, so if you stop early what you skip is what is safest to skip.
+    rev.sort((a, b) => L.retention(rec(a.id), t) - L.retention(rec(b.id), t));
+    const d = today();
+    const newLeft = Math.min(fresh.length, Math.max(0, prefs.newPerDay + d.xn - d.n));
+    const revLeft = Math.min(rev.length, Math.max(0, prefs.revPerDay + d.xr - d.r));
+    return { lrn, rev, fresh, newLeft, revLeft };
+  }
+
+  // ---------- session ----------
+  // scope: decks being studied; ahead: ids for "review early"; cur/revealed: the card on screen
+  let sess = null, undoStack = [];
+  const startSession = (deckIds) => {
+    sess = { scope: scopeOf(deckIds), ahead: [], cur: null, revealed: false, shownAt: 0, count: 0, last: null, seen: 0 };
+    pickNext();
+    renderStudy();
+    window.scrollTo({ top: 0 });
+  };
+  const endSession = () => { sess = null; renderStudy(); renderOverall(); window.scrollTo({ top: 0 }); };
+
+  function pickNext() {
+    const t = now(), p = pools(sess.scope);
+    const notLast = (list) => list.find(c => c.id !== sess.last) || null;
+    const dueLrn = p.lrn.filter(c => rec(c.id).due <= t);
+    sess.ahead = sess.ahead.filter(id => avail(id) && rec(id) && L.isReview(rec(id)));
+    let next = notLast(dueLrn);
+    if (!next) {
+      if (sess.ahead.length) next = byId.get(sess.ahead[0]);
+      else if (p.newLeft && p.revLeft) {
+        // Blend new cards evenly through the reviews.
+        const every = Math.max(1, Math.round((p.newLeft + p.revLeft) / p.newLeft));
+        next = sess.count % every === 0 ? p.fresh[0] : p.rev[0];
+      } else if (p.newLeft) next = p.fresh[0];
+      else if (p.revLeft) next = p.rev[0];
+    }
+    // Nothing else to do: don't make you wait out a short learning step.
+    if (!next) next = notLast(p.lrn) || dueLrn[0] || p.lrn[0] || null;
+    sess.cur = next ? next.id : null;
+    sess.revealed = false;
+    sess.shownAt = t;
+    sess.count++;
+  }
+
+  function reveal() {
+    if (!sess || !sess.cur || sess.revealed) return;
+    sess.revealed = true;
+    renderStudy();
+  }
+
+  function gradeCard(rating) {
+    if (!sess || !sess.cur || !sess.revealed) return;
+    const id = sess.cur, prev = rec(id), t = now(), d = today();
+    undoStack.push({ id, card: prev, bury: state.bury[id], susp: state.susp[id], day: Object.assign({}, d), dayKey: L.dayNo(t) });
+    if (undoStack.length > 100) undoStack.shift();
+    state.cards[id] = L.grade(prev, rating, t, prefs.target, Math.random);
+    if (L.isNew(prev)) d.n++;
+    else if (L.isReview(prev)) { d.r++; if (rating > L.AGAIN) d.ok++; }
+    else d.l++;
+    d.ms += Math.min(t - sess.shownAt, 120000);
+    sess.last = id; sess.seen++;
+    sess.ahead = sess.ahead.filter(x => x !== id);
+    persist();
+    pickNext();
+    renderStudy(); renderOverall();
+    window.scrollTo({ top: 0 });
+  }
+
+  function undo() {
+    const u = undoStack.pop();
+    if (!u) return;
+    if (u.card) state.cards[u.id] = u.card; else delete state.cards[u.id];
+    if (u.bury === undefined) delete state.bury[u.id]; else state.bury[u.id] = u.bury;
+    if (u.susp === undefined) delete state.susp[u.id]; else state.susp[u.id] = u.susp;
+    state.days[u.dayKey] = u.day;
+    persist();
+    sess.cur = u.id; sess.revealed = false; sess.shownAt = now();
+    renderStudy(); renderOverall();
+    window.scrollTo({ top: 0 });
+  }
+
+  function setAside(kind) {
+    if (!sess || !sess.cur) return;
+    const id = sess.cur, d = today();
+    undoStack.push({ id, card: rec(id), bury: state.bury[id], susp: state.susp[id], day: Object.assign({}, d), dayKey: L.dayNo(now()) });
+    if (kind === "bury") state.bury[id] = L.dayNo(now()); else state.susp[id] = true;
+    sess.last = id;
+    persist();
+    pickNext();
+    renderStudy(); renderOverall();
+    window.scrollTo({ top: 0 });
+  }
+
+  function extra(kind, n) {
+    const d = today();
+    if (kind === "new") d.xn += n; else d.xr += n;
+    persist();
+  }
+
+  function studyAhead(scope, n) {
+    const t = now(), list = C.filter(c => inScope(c, scope) && avail(c.id) && L.isReview(rec(c.id)) && !L.isDueToday(rec(c.id), t, prefs.target));
+    list.sort((a, b) => L.retention(rec(a.id), t) - L.retention(rec(b.id), t));
+    return list.slice(0, n).map(c => c.id);
+  }
+
+  // ---------- rendering pieces ----------
+  const deckName = (c) => D[c.d[0]].name;
+  const stateTag = (r) => L.isNew(r) ? `<span class="tag n-new">新卡</span>`
+    : L.isLearning(r) ? `<span class="tag n-lrn">${r.ph === "x" ? "重学" : "学习中"}</span>` : `<span class="tag n-rev">复习</span>`;
+
+  function langSeg(c) {
+    if (!c.ae) return "";
+    const b = (v, t) => `<button type="button" data-lang="${v}" aria-pressed="${prefs.lang === v}">${t}</button>`;
+    return `<span class="seg" role="group" aria-label="解析语言" title="切换语言（L）">${b("zh", "中")}${b("en", "EN")}${b("both", "双语")}</span>`;
+  }
+  const effLang = (c) => c.ae ? prefs.lang : "zh";
+  function questionHtml(c) {
+    const l = effLang(c);
+    if (l === "en") return `<p class="qtext">${c.qe}</p>`;
+    return `<p class="qtext">${c.q}</p>` + (l === "both" ? `<p class="qen">${c.qe}</p>` : "");
+  }
+  function answerHtml(c) {
+    const l = effLang(c);
+    let h = "";
+    if (l === "both") h = `<div class="lang">中文</div><div class="ans">${c.a}</div><div class="lang">ENGLISH</div><div class="ans">${c.ae}</div>`;
+    else h = `<div class="ans">${l === "en" ? c.ae : c.a}</div>`;
+    if (!c.ae) h += `<div class="noen">这张卡暂无英文解析</div>`;
+    if (c.src) h += `<div class="srcline">来源：<a href="${esc(c.src)}" target="_blank" rel="noopener noreferrer">查看原文</a></div>`;
+    return h;
+  }
+  function memoHtml(r) {
+    if (L.isNew(r)) return "";
+    const t = now(), R = L.retention(r, t), parts = [];
+    if (R !== null) parts.push(`当前记忆保留 <b>${Math.round(R * 100)}%</b>`);
+    if (r.s) parts.push(`稳定度 <b>${r.s < 10 ? r.s.toFixed(1) : Math.round(r.s)} 天</b>`);
+    parts.push(`已复习 <b>${r.n || 0}</b> 次`);
+    if (r.lap) parts.push(`遗忘 <b>${r.lap}</b> 次`);
+    return `<div class="memo">${parts.map(p => `<span>${p}</span>`).join("")}</div>`;
+  }
+
+  // ---------- study view ----------
+  function deckCounts() {
+    const t = now(), per = D.map(() => ({ n: 0, l: 0, r: 0, total: 0 })), top = {};
+    TOPS.forEach(x => top[x] = { n: 0, l: 0, r: 0, total: 0 });
+    for (const c of C) {
+      const r = rec(c.id), ok = avail(c.id);
+      const key = !ok ? null : L.isNew(r) ? "n" : L.isLearning(r) ? "l" : L.isDueToday(r, t, prefs.target) ? "r" : null;
+      c.d.forEach(i => { per[i].total++; if (key) per[i][key]++; });
+      new Set(c.d.map(i => D[i].top)).forEach(x => { top[x].total++; if (key) top[x][key]++; });
+    }
+    return { per, top };
+  }
+  const numCells = (x) => `<div class="num"><span class="n-new ${x.n ? "" : "zero"}">${x.n}</span><span class="n-lrn ${x.l ? "" : "zero"}">${x.l}</span><span class="n-rev ${x.r ? "" : "zero"}">${x.r}</span></div>`;
+
+  function renderHome() {
+    const scope = scopeOf(prefs.sel), p = pools(scope), { per, top } = deckCounts();
+    const has = p.newLeft + p.revLeft + p.lrn.length;
+    const more = [];
+    if (!has && prefs.sel.length) {
+      if (p.fresh.length) more.push(`<button class="btn" data-more="new">再来 10 张新卡</button>`);
+      if (p.rev.length) more.push(`<button class="btn" data-more="rev">继续复习顺延的 ${p.rev.length} 张</button>`);
+      if (studyAhead(scope, 1).length) more.push(`<button class="btn" data-more="ahead">提前复习 20 张</button>`);
+    }
+    let h = `<div class="card"><div class="today">
+      <div class="big">
+        <div><b class="n-new">${p.newLeft}</b><span>新卡</span></div>
+        <div><b class="n-lrn">${p.lrn.length}</b><span>学习中</span></div>
+        <div><b class="n-rev">${p.revLeft}</b><span>待复习</span></div>
+      </div>
+      <div class="act"><button class="btn primary start" id="startBtn" ${has ? "" : "disabled"}>开始学习</button></div>
+    </div>
+    ${!prefs.sel.length ? `<p class="hint sub">先在下面勾选要学的牌组。</p>` : !has ? `<p class="hint sub">今天的任务完成了。想多学一点也可以：</p>` : ""}
+    ${more.length ? `<div class="more">${more.join("")}</div>` : ""}
+    </div>`;
+    h += `<div class="card"><div class="dhead"><h2>牌组（勾选后一起学）</h2><div class="num"><span class="n-new">新</span><span class="n-lrn">学</span><span class="n-rev">复</span></div></div><ul class="decks">`;
+    TOPS.forEach((tp, ti) => {
+      const kids = D.map((d, i) => ({ d, i })).filter(x => x.d.top === tp);
+      const on = kids.filter(x => prefs.sel.includes(x.d.id)).length;
+      const open = prefs.open.includes(tp);
+      h += `<li><div class="drow top"><button class="caret" data-caret="${ti}" aria-label="展开或收起 ${esc(tp)}" aria-expanded="${open}">${open ? "▾" : "▸"}</button>
+        <input type="checkbox" data-top="${ti}" aria-label="勾选 ${esc(tp)}" ${on === kids.length ? "checked" : ""} ${on && on < kids.length ? "data-mixed" : ""}>
+        <span class="name" title="${esc(tp)}">${esc(tp)} <span class="dim">· ${top[tp].total} 张</span></span>
+        <button class="btn small go" data-go-top="${ti}">只学这组</button>${numCells(top[tp])}</div>`;
+      if (open) kids.forEach(({ d, i }) => {
+        h += `<div class="drow child"><input type="checkbox" data-deck="${i}" aria-label="勾选 ${esc(d.name)}" ${prefs.sel.includes(d.id) ? "checked" : ""}>
+          <span class="name" title="${esc(d.name)}">${esc(d.name)} <span class="dim">· ${per[i].total}</span></span>
+          <button class="btn small go" data-go="${i}">只学这个</button>${numCells(per[i])}</div>`;
+      });
+      h += `</li>`;
+    });
+    h += `</ul></div>
+      <p class="hint" style="margin-top:12px">按遗忘曲线安排：记得越牢，下次间隔越长。不用每天做完，积压的卡会优先出最快忘掉的。</p>`;
+    const v = $("v-study");
+    v.innerHTML = h;
+    v.querySelectorAll("[data-mixed]").forEach(x => { x.indeterminate = true; });
+    const startBtn = $("startBtn");
+    if (startBtn) startBtn.addEventListener("click", () => startSession(prefs.sel));
+    v.querySelectorAll("[data-caret]").forEach(b => b.addEventListener("click", () => {
+      const tp = TOPS[+b.dataset.caret];
+      prefs.open = prefs.open.includes(tp) ? prefs.open.filter(x => x !== tp) : [...prefs.open, tp];
+      persist(); renderHome();
+    }));
+    v.querySelectorAll("[data-top]").forEach(x => x.addEventListener("change", () => {
+      const ids = D.filter(d => d.top === TOPS[+x.dataset.top]).map(d => d.id);
+      prefs.sel = x.checked ? [...new Set([...prefs.sel, ...ids])] : prefs.sel.filter(i => !ids.includes(i));
+      persist(); renderHome();
+    }));
+    v.querySelectorAll("[data-deck]").forEach(x => x.addEventListener("change", () => {
+      const id = D[+x.dataset.deck].id;
+      prefs.sel = x.checked ? [...prefs.sel, id] : prefs.sel.filter(i => i !== id);
+      persist(); renderHome();
+    }));
+    v.querySelectorAll("[data-go]").forEach(b => b.addEventListener("click", () => startSession([D[+b.dataset.go].id])));
+    v.querySelectorAll("[data-go-top]").forEach(b => b.addEventListener("click", () =>
+      startSession(D.filter(d => d.top === TOPS[+b.dataset.goTop]).map(d => d.id))));
+    v.querySelectorAll("[data-more]").forEach(b => b.addEventListener("click", () => {
+      runMore(b.dataset.more, prefs.sel);
+    }));
+  }
+
+  function runMore(kind, deckIds) {
+    const scope = scopeOf(deckIds);
+    if (kind === "new") extra("new", 10);
+    if (kind === "rev") extra("rev", pools(scope).rev.length);
+    const ahead = kind === "ahead" ? studyAhead(scope, 20) : [];
+    if (!sess) sess = { scope, ahead: [], cur: null, revealed: false, shownAt: 0, count: 0, last: null, seen: 0 };
+    sess.ahead = ahead;
+    pickNext();
+    renderStudy();
+    window.scrollTo({ top: 0 });
+  }
+
+  function countsLine(p, curKind) {
+    const u = (k) => curKind === k ? "on" : "";
+    return `<span class="counts" title="新卡 · 学习中 · 待复习"><span class="n-new ${u("n")}">${p.newLeft}</span><span class="n-lrn ${u("l")}">${p.lrn.length}</span><span class="n-rev ${u("r")}">${p.revLeft + sess.ahead.length}</span></span>`;
+  }
+
+  function renderSession() {
+    const p = pools(sess.scope), v = $("v-study");
+    if (!sess.cur) {
+      const scope = sess.scope, more = [];
+      if (p.fresh.length) more.push(`<button class="btn" data-more="new">再来 10 张新卡</button>`);
+      if (p.rev.length) more.push(`<button class="btn" data-more="rev">继续复习顺延的 ${p.rev.length} 张</button>`);
+      if (studyAhead(scope, 1).length) more.push(`<button class="btn" data-more="ahead">提前复习 20 张</button>`);
+      v.innerHTML = `<div class="card done"><h3>这一轮完成了</h3>
+        <p class="muted">本轮过了 ${sess.seen} 张。明天还会按遗忘曲线安排到期的卡。</p>
+        <div class="more">${more.join("")}<button class="btn primary" id="backHome">回到牌组</button></div>
+        ${undoStack.length ? `<div class="more"><button class="btn ghost small" id="undoBtn">撤销上一张</button></div>` : ""}</div>`;
+      $("backHome").addEventListener("click", endSession);
+      if ($("undoBtn")) $("undoBtn").addEventListener("click", undo);
+      const ids = D.filter((d, i) => scope.has(i)).map(d => d.id);
+      v.querySelectorAll("[data-more]").forEach(b => b.addEventListener("click", () => runMore(b.dataset.more, ids)));
+      return;
+    }
+    const c = byId.get(sess.cur), r = rec(c.id), starred = !!state.stars[c.id];
+    const kind = L.isNew(r) ? "n" : L.isLearning(r) ? "l" : "r";
+    let h = `<div class="topbar"><button class="btn ghost small" id="backHome">← 牌组</button>${countsLine(p, kind)}<span class="grow"></span>${langSeg(c)}</div>
+      <div class="card fc"><div class="meta">${stateTag(r)}<span>${esc(deckName(c))}</span>
+        <span class="right"><button class="star" id="star" aria-pressed="${starred}" title="标星（S）">${starred ? "★" : "☆"}</button></span></div>
+      ${questionHtml(c)}`;
+    if (sess.revealed) {
+      h += `<hr class="split">${answerHtml(c)}${memoHtml(r)}${noteBlock(c.id)}`;
+    }
+    h += `</div><div class="bar">`;
+    if (!sess.revealed) {
+      h += `<button class="btn primary flip" id="flip">显示答案 <kbd>空格</kbd></button>`;
+    } else {
+      const pv = L.preview(r, now(), prefs.target);
+      const g = (rt, name) => `<button class="grade" data-r="${rt}"><b>${name}</b><small>${L.fmtDelay(pv[rt])}</small></button>`;
+      h += `<div class="grades">${g(1, "忘了")}${g(2, "困难")}${g(3, "记得")}${g(4, "轻松")}</div>`;
+    }
+    h += `<div class="tools"><button class="btn ghost small" id="undoBtn" ${undoStack.length ? "" : "disabled"} title="撤销（Z）">撤销</button>
+        <button class="btn ghost small" id="buryBtn" title="今天先不看，明天再出现（B）">今天跳过</button>
+        <button class="btn ghost small" id="suspBtn" title="不再安排这张卡，可在「浏览」恢复（X）">不再复习</button>
+        <span class="grow"></span>
+        <span class="hint">${sess.revealed ? `<kbd>1</kbd>–<kbd>4</kbd> 评分 · <kbd>空格</kbd> 记得` : `先想一想，再翻面`}</span></div></div>`;
+    v.innerHTML = h;
+    $("backHome").addEventListener("click", endSession);
+    $("star").addEventListener("click", toggleStar);
+    $("undoBtn").addEventListener("click", undo);
+    $("buryBtn").addEventListener("click", () => setAside("bury"));
+    $("suspBtn").addEventListener("click", () => setAside("susp"));
+    if ($("flip")) $("flip").addEventListener("click", reveal);
+    v.querySelectorAll(".grade").forEach(b => b.addEventListener("click", () => gradeCard(+b.dataset.r)));
+    v.querySelectorAll(".seg button").forEach(b => b.addEventListener("click", () => setLang(b.dataset.lang)));
+    const n = v.querySelector(".mynote");
+    if (n) wireNote(n, c.id, () => { renderTabs(); });
+  }
+
+  function renderStudy() { if (sess) renderSession(); else renderHome(); }
+  function setLang(l) { prefs.lang = l; persist(); if (prefs.tab === "study") renderStudy(); else if (prefs.tab === "browse") renderBrowse(); else if (prefs.tab === "notes") renderNotes(); }
+  function cycleLang() { const o = ["both", "zh", "en"]; setLang(o[(o.indexOf(prefs.lang) + 1) % 3]); }
+  function toggleStar() {
+    if (!sess || !sess.cur) return;
+    const id = sess.cur;
+    if (state.stars[id]) delete state.stars[id]; else state.stars[id] = true;
+    persist();
+    const s = $("star");
+    s.setAttribute("aria-pressed", !!state.stars[id]); s.textContent = state.stars[id] ? "★" : "☆";
+  }
+
+  // ---------- notes (shared) ----------
+  const noteText = (id) => (state.notes[id] && state.notes[id].text) || "";
+  const noteImgs = (id) => (state.notes[id] && state.notes[id].imgs) || [];
+  const hasNote = (id) => noteText(id).trim() !== "" || noteImgs(id).length > 0;
+  function fit(ta) { ta.style.height = "auto"; ta.style.height = (ta.scrollHeight + 2) + "px"; }
+  function setNote(id, patch) {
+    const n = Object.assign({ text: "", imgs: [] }, state.notes[id], patch);
+    if (n.text.trim() || n.imgs.length) state.notes[id] = { text: n.text, imgs: n.imgs, t: Date.now() }; else delete state.notes[id];
+    persist();
+  }
+  function noteBlock(id) {
+    const n = state.notes[id];
+    return `<details class="mynote" ${hasNote(id) ? "open" : ""}><summary>我的笔记</summary>
+      <div class="notehead"><span>可粘贴或拖入图片，自动保存</span><span class="saved">${n ? "已保存 " + when(n.t) : ""}</span></div>
+      <textarea placeholder="写点自己的理解…">${esc(noteText(id))}</textarea><div class="nimgs"></div></details>`;
+  }
+  // Pasted images live in IndexedDB (localStorage is too small); a note keeps only their keys.
+  const imgDB = new Promise((res, rej) => {
+    const r = indexedDB.open("interview-anki-images", 1);
+    r.onupgradeneeded = () => r.result.createObjectStore("imgs");
+    r.onsuccess = () => res(r.result); r.onerror = () => rej(r.error);
+  });
+  async function idb(mode, fn) {
+    const db = await imgDB;
+    return new Promise((res, rej) => {
+      const tx = db.transaction("imgs", mode), req = fn(tx.objectStore("imgs"));
+      tx.oncomplete = () => res(req && req.result); tx.onerror = tx.onabort = () => rej(tx.error);
+    });
+  }
+  const urls = new Map();
+  async function imgURL(k) {
+    if (!urls.has(k)) {
+      const b = await idb("readonly", st => st.get(k)).catch(() => null);
+      urls.set(k, b ? URL.createObjectURL(b) : "");
+    }
+    return urls.get(k);
+  }
+  function dropImgs(keys) {
+    if (!keys.length) return;
+    keys.forEach(k => { if (urls.get(k)) URL.revokeObjectURL(urls.get(k)); urls.delete(k); });
+    idb("readwrite", st => { keys.forEach(k => st.delete(k)); }).catch(() => {});
+  }
+  async function fillImgs(strip, id) {
+    const keys = noteImgs(id), srcs = await Promise.all(keys.map(imgURL));
+    strip.innerHTML = keys.map((k, i) => srcs[i] ? `<figure class="nimg"><img src="${srcs[i]}" alt="笔记图片 ${i + 1}" data-k="${k}">
+      <button type="button" class="x" data-k="${k}" title="删除图片" aria-label="删除图片">×</button></figure>` : "").join("");
+  }
+  function wireNote(wrap, id, onChange) {
+    const ta = wrap.querySelector("textarea"), strip = wrap.querySelector(".nimgs"), saved = wrap.querySelector(".saved");
+    const change = (patch) => {
+      setNote(id, patch);
+      if (saved) saved.textContent = hasNote(id) ? "已保存 " + when(state.notes[id].t) : "";
+      onChange();
+    };
+    fit(ta); fillImgs(strip, id);
+    if (wrap.tagName === "DETAILS") wrap.addEventListener("toggle", () => fit(ta));
+    ta.addEventListener("input", () => { fit(ta); change({ text: ta.value }); });
+    const take = async (dt, e) => {
+      const files = [...dt.files].filter(f => f.type.startsWith("image/"));
+      if (!files.length) return;
+      e.preventDefault();
+      const keys = [];
+      try {
+        for (const f of files) {
+          const k = `${id}-${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`;
+          await idb("readwrite", st => st.put(f, k)); keys.push(k);
+        }
+      } catch (err) { alert("图片保存失败：" + (err && err.message)); }
+      if (keys.length) { change({ imgs: noteImgs(id).concat(keys) }); fillImgs(strip, id); }
+    };
+    // Rich text copied from Word or slides also carries a picture of itself; keep the text in that case.
+    ta.addEventListener("paste", e => {
+      const t = e.clipboardData.types;
+      if (!(t.includes("text/plain") && t.includes("text/html"))) take(e.clipboardData, e);
+    });
+    ta.addEventListener("drop", e => take(e.dataTransfer, e));
+    strip.addEventListener("click", e => {
+      const k = e.target.dataset.k; if (!k) return;
+      if (e.target.tagName === "IMG") { showBig(e.target.src); return; }
+      change({ imgs: noteImgs(id).filter(x => x !== k) }); dropImgs([k]); fillImgs(strip, id);
+    });
+  }
+  function showBig(src) { $("lightbox").querySelector("img").src = src; $("lightbox").hidden = false; }
+  $("lightbox").addEventListener("click", () => { $("lightbox").hidden = true; });
+
+  // ---------- browse ----------
+  let bShown = 100;
+  const searchText = (() => {
+    const cache = new Map();
+    return (c) => {
+      if (!cache.has(c.id)) cache.set(c.id, (plain(c.q + " " + c.a + " " + (c.qe || "") + " " + (c.ae || "")) + " " + c.d.map(i => D[i].name).join(" ") + " " + (c.tags || []).join(" ")).toLowerCase());
+      return cache.get(c.id);
+    };
+  })();
+  function buildDeckFilter() {
+    let h = `<option value="all">全部牌组</option>`;
+    TOPS.forEach((tp, ti) => {
+      h += `<optgroup label="${esc(tp)}"><option value="t${ti}">${esc(tp)}（全部）</option>`;
+      D.forEach((d, i) => { if (d.top === tp) h += `<option value="${i}">${esc(d.name)}</option>`; });
+      h += `</optgroup>`;
+    });
+    $("bDeck").innerHTML = h;
+  }
+  function browseList() {
+    const terms = $("bSearch").value.trim().toLowerCase().split(/\s+/).filter(Boolean), dk = $("bDeck").value, st = $("bState").value, t = now();
+    const inDeck = dk === "all" ? () => true
+      : dk[0] === "t" ? (c) => c.d.some(i => D[i].top === TOPS[+dk.slice(1)])
+      : (c) => c.d.includes(+dk);
+    const test = {
+      all: () => true,
+      new: (c) => L.isNew(rec(c.id)),
+      lrn: (c) => L.isLearning(rec(c.id)),
+      rev: (c) => L.isReview(rec(c.id)),
+      due: (c) => L.isDueToday(rec(c.id), t, prefs.target) && avail(c.id),
+      star: (c) => !!state.stars[c.id],
+      susp: (c) => !!state.susp[c.id],
+      en: (c) => !!c.ae,
+    }[st];
+    const list = C.filter(c => inDeck(c) && test(c) && terms.every(w => searchText(c).includes(w)));
+    if ($("bSort").value === "weak") {
+      const w = (c) => { const R = L.retention(rec(c.id), t); return R === null ? 2 : R; };
+      list.sort((a, b) => w(a) - w(b));
+    }
+    return list;
+  }
+  function browseMeta(c) {
+    const r = rec(c.id), t = now(), bits = [];
+    if (state.stars[c.id]) bits.push("★");
+    if (state.susp[c.id]) bits.push("已暂停");
+    else if (isBuried(c.id)) bits.push("今日跳过");
+    if (L.isNew(r)) bits.push("新卡");
+    else {
+      if (L.isLearning(r)) bits.push("学习中");
+      const R = L.retention(r, t);
+      if (R !== null) bits.push(Math.round(R * 100) + "%");
+      if (L.isReview(r)) { const ms = L.dueAt(r, prefs.target) - t; bits.push(ms <= 0 ? "已到期" : L.fmtDelay(ms) + "后"); }
+    }
+    return bits.join(" · ");
+  }
+  function renderBrowse() {
+    const list = browseList(), box = $("bList");
+    $("bCount").textContent = `${list.length} 张卡。这里随便看，不影响复习安排。`;
+    box.innerHTML = list.length ? list.slice(0, bShown).map(c =>
+      `<details class="brow" data-id="${c.id}"><summary><span class="bq">${esc(plain(c.q))}</span><span class="bm">${esc(browseMeta(c))}</span></summary></details>`).join("")
+      : `<div class="empty">没有符合条件的卡片。</div>`;
+    $("bMore").hidden = list.length <= bShown;
+    box.querySelectorAll(".brow").forEach(d => d.addEventListener("toggle", () => {
+      if (d.open && !d.querySelector(".inner")) fillBrowseRow(d);
+    }));
+  }
+  function fillBrowseRow(d) {
+    const id = d.dataset.id, c = byId.get(id), r = rec(id);
+    const inner = document.createElement("div");
+    inner.className = "inner";
+    inner.innerHTML = `<div class="meta">${stateTag(r)}<span>${esc(c.d.map(i => D[i].name).join("、"))}</span><span class="right">${langSeg(c)}</span></div>
+      ${questionHtml(c)}<hr class="split">${answerHtml(c)}${memoHtml(r)}${noteBlock(id)}
+      <div class="tools"><button class="btn small" data-a="star">${state.stars[id] ? "取消标星" : "标星"}</button>
+        <button class="btn small" data-a="susp">${state.susp[id] ? "恢复复习" : "不再复习"}</button>
+        ${isBuried(id) ? `<button class="btn small" data-a="unbury">取消今日跳过</button>` : ""}
+        ${L.isNew(r) ? "" : `<button class="btn small" data-a="reset">设为新卡</button>`}</div>`;
+    d.appendChild(inner);
+    wireNote(inner.querySelector(".mynote"), id, renderTabs);
+    inner.querySelectorAll(".seg button").forEach(b => b.addEventListener("click", () => { prefs.lang = b.dataset.lang; persist(); inner.remove(); fillBrowseRow(d); }));
+    inner.querySelectorAll("[data-a]").forEach(b => b.addEventListener("click", () => {
+      const a = b.dataset.a;
+      if (a === "star") { if (state.stars[id]) delete state.stars[id]; else state.stars[id] = true; }
+      if (a === "susp") { if (state.susp[id]) delete state.susp[id]; else state.susp[id] = true; }
+      if (a === "unbury") delete state.bury[id];
+      if (a === "reset") { if (!confirm("把这张卡的学习进度清零，当作新卡重新学？")) return; delete state.cards[id]; }
+      persist();
+      d.querySelector(".bm").textContent = browseMeta(c);
+      inner.remove(); fillBrowseRow(d);
+    }));
+  }
+  ["bSearch", "bDeck", "bState", "bSort"].forEach(id => $(id).addEventListener(id === "bSearch" ? "input" : "change", () => { bShown = 100; renderBrowse(); }));
+  $("bMore").addEventListener("click", () => { bShown += 200; renderBrowse(); });
+
+  // ---------- notes tab ----------
+  function notedCards() {
+    const list = C.filter(c => hasNote(c.id));
+    if ($("nSort").value === "recent") list.sort((a, b) => state.notes[b.id].t - state.notes[a.id].t);
+    return list;
+  }
+  function renderNotes() {
+    const terms = $("nSearch").value.trim().toLowerCase().split(/\s+/).filter(Boolean);
+    let list = notedCards();
+    if (terms.length) list = list.filter(c => { const hay = (noteText(c.id) + " " + searchText(c)).toLowerCase(); return terms.every(w => hay.includes(w)); });
+    const box = $("nList");
+    if (!list.length) {
+      box.innerHTML = `<div class="card empty">${Object.keys(state.notes).some(hasNote) ? "没有匹配的笔记。" : "还没有笔记。翻开答案后可以在「我的笔记」里写。"}</div>`;
+      return;
+    }
+    box.innerHTML = list.map(c => `<article class="card ncard" data-id="${c.id}">
+      <div class="meta"><span>${esc(deckName(c))}</span></div>${questionHtml(c)}
+      <details class="reveal"><summary>查看答案</summary><div style="margin-top:8px">${answerHtml(c)}</div></details>
+      <div class="mynote"><div class="notehead"><span>我的笔记</span><span class="saved"></span></div>
+        <textarea placeholder="可粘贴或拖入图片">${esc(noteText(c.id))}</textarea><div class="nimgs"></div></div>
+      <div class="nfoot"><span>编辑于 ${when(state.notes[c.id].t)}</span><span class="grow"></span>
+        <button class="btn ghost small" data-del="1">删除笔记</button></div></article>`).join("");
+    box.querySelectorAll(".ncard").forEach(card => {
+      const id = card.dataset.id;
+      wireNote(card.querySelector(".mynote"), id, renderTabs);
+      card.querySelector("[data-del]").addEventListener("click", () => {
+        if (!confirm("删除这条笔记？")) return;
+        dropImgs(noteImgs(id)); setNote(id, { text: "", imgs: [] }); renderTabs(); renderNotes();
+      });
+    });
+  }
+  $("nSearch").addEventListener("input", renderNotes);
+  $("nSort").addEventListener("change", renderNotes);
+  $("nExport").addEventListener("click", () => {
+    const list = notedCards();
+    if (!list.length) { alert("还没有可导出的笔记。"); return; }
+    const lines = [`面试八股 · 我的笔记（${list.length} 条）`, `导出于 ${new Date().toLocaleString("zh-CN")}`, ""];
+    list.forEach(c => {
+      lines.push("=".repeat(60), `[${deckName(c)}]`, "题目：" + plain(c.q));
+      if (c.qe) lines.push("Q: " + plain(c.qe));
+      lines.push("", "我的笔记：", noteText(c.id).trim());
+      const n = noteImgs(c.id).length;
+      if (n) lines.push(`（${n} 张图片未包含在文本里）`);
+      lines.push("");
+    });
+    download("interview-anki-notes.txt", lines.join("\n"), "text/plain;charset=utf-8");
+  });
+  function download(name, text, type) {
+    const blob = new Blob([text], { type }), link = document.createElement("a");
+    link.href = URL.createObjectURL(blob); link.download = name;
+    document.body.appendChild(link); link.click(); link.remove();
+    setTimeout(() => URL.revokeObjectURL(link.href), 1000);
+  }
+
+  // ---------- stats ----------
+  function renderStats() {
+    const t = now(), d = today(), day0 = L.dayNo(t);
+    const learned = C.filter(c => !L.isNew(rec(c.id)));
+    const reviewing = learned.filter(c => L.isReview(rec(c.id)));
+    let rev30 = 0, ok30 = 0, streak = 0;
+    Object.entries(state.days).forEach(([k, v]) => { if (day0 - +k < 30) { rev30 += v.r; ok30 += v.ok; } });
+    const active = (k) => { const v = state.days[k]; return v && (v.n + v.r + v.l) > 0; };
+    for (let k = active(day0) ? day0 : day0 - 1; active(k); k--) streak++;
+    const mature = reviewing.filter(c => rec(c.id).s >= 21).length;
+    const tile = (l, v) => `<div class="tile"><span>${l}</span><b>${v}</b></div>`;
+    const mins = Math.round(d.ms / 6e4);
+
+    const fc = Array.from({ length: 14 }, () => 0);
+    reviewing.forEach(c => {
+      if (state.susp[c.id]) return;
+      const off = L.dayNo(L.dueAt(rec(c.id), prefs.target)) - day0;
+      if (off < 14) fc[Math.max(0, off)]++;
+    });
+    const fcItems = fc.map((v, i) => ({ v, label: i === 0 ? "今天" : i === 1 ? "明天" : (i % 3 === 0 ? `+${i}` : ""), tip: `${i === 0 ? "今天（含逾期）" : i === 1 ? "明天" : i + " 天后"}：${v} 张` }));
+
+    const bins = [["<50%", 0, .5], ["50–70%", .5, .7], ["70–85%", .7, .85], ["85–95%", .85, .95], ["≥95%", .95, 1.01]];
+    const dist = bins.map(([label, lo, hi]) => {
+      const v = learned.filter(c => { const R = L.retention(rec(c.id), t); return R !== null && R >= lo && R < hi; }).length;
+      return { v, label, tip: `记忆保留 ${label}：${v} 张` };
+    });
+
+    $("v-stats").innerHTML = `<div class="tiles">
+      ${tile("今日新学", d.n)}${tile("今日复习", d.r)}${tile("今日用时", mins + " 分钟")}${tile("连续学习", streak + " 天")}
+      ${tile("近 30 天答对率", rev30 ? Math.round(100 * ok30 / rev30) + "%" : "–")}
+      ${tile("已学 / 总数", `${learned.length} / ${C.length}`)}${tile("长期记忆（≥21 天）", mature)}</div>
+      <div class="card" style="margin-top:12px"><h2>未来 14 天要复习的卡片数</h2>${chart(fcItems)}${tableOf(fcItems.map((x, i) => [x.tip.split("：")[0], fc[i]]), "日期", "卡片数")}</div>
+      <div class="card"><h2>当前记忆保留分布（已学卡片）</h2>${learned.length ? chart(dist) + tableOf(dist.map(x => [x.label, x.v]), "记忆保留", "卡片数") : `<div class="empty">学过一些卡片后，这里会显示它们按遗忘曲线衰减到了哪里。</div>`}</div>`;
+    wireTips();
+  }
+  function chart(items) {
+    const max = Math.max(1, ...items.map(x => x.v));
+    let peak = items.findIndex(x => x.v === max && x.v > 0);
+    const cols = items.map((x, i) => `<div class="col" tabindex="0" data-tip="${esc(x.tip)}" aria-label="${esc(x.tip)}">
+        ${i === peak ? `<em style="bottom:${100 * x.v / max}%">${x.v}</em>` : ""}${x.v ? `<i style="height:${Math.max(2, 100 * x.v / max)}%"></i>` : ""}</div>`).join("");
+    const labels = items.map(x => `<span>${esc(x.label)}</span>`).join("");
+    return `<div class="chart">${cols}</div><div class="xlabels">${labels}</div>`;
+  }
+  const tableOf = (rows, a, b) => `<details class="tbl"><summary>查看数据表</summary><table><thead><tr><th>${a}</th><th>${b}</th></tr></thead><tbody>${rows.map(r => `<tr><td>${esc(r[0])}</td><td>${r[1]}</td></tr>`).join("")}</tbody></table></details>`;
+  function wireTips() {
+    const tip = $("tip");
+    const show = (el, x, y) => { tip.textContent = el.dataset.tip; tip.hidden = false; tip.style.left = Math.min(x + 12, innerWidth - tip.offsetWidth - 8) + "px"; tip.style.top = (y - 30) + "px"; };
+    document.querySelectorAll("[data-tip]").forEach(el => {
+      el.addEventListener("mousemove", e => show(el, e.clientX, e.clientY));
+      el.addEventListener("mouseleave", () => { tip.hidden = true; });
+      el.addEventListener("focus", () => { const b = el.getBoundingClientRect(); show(el, b.left, b.top); });
+      el.addEventListener("blur", () => { tip.hidden = true; });
+    });
+  }
+
+  // ---------- settings ----------
+  function renderLadder() {
+    const days = L.goodLadder(prefs.target, 7).map(x => L.fmtDelay(x * L.DAY));
+    $("ladder").innerHTML = `如果每次都选「记得」，一张卡的间隔大约是：<b>10 分钟 → ${days.join(" → ")}</b>。选「忘了」就回到短间隔，但已有的记忆不会全部清零。`;
+  }
+  function loadSettings() {
+    $("sNew").value = prefs.newPerDay; $("sRev").value = prefs.revPerDay;
+    $("sTarget").value = String(prefs.target); $("sOrder").value = prefs.newOrder;
+    renderLadder();
+  }
+  const clampInt = (v, lo, hi, dflt) => { const n = parseInt(v, 10); return Number.isFinite(n) ? Math.min(hi, Math.max(lo, n)) : dflt; };
+  $("sNew").addEventListener("change", e => { prefs.newPerDay = clampInt(e.target.value, 0, 999, 20); e.target.value = prefs.newPerDay; persist(); });
+  $("sRev").addEventListener("change", e => { prefs.revPerDay = clampInt(e.target.value, 0, 9999, 200); e.target.value = prefs.revPerDay; persist(); });
+  $("sTarget").addEventListener("change", e => { prefs.target = +e.target.value; persist(); renderLadder(); });
+  $("sOrder").addEventListener("change", e => { prefs.newOrder = e.target.value; persist(); });
+  $("exportBtn").addEventListener("click", () => {
+    const stamp = new Date().toISOString().slice(0, 10).replace(/-/g, "");
+    download(`interview-anki-progress-${stamp}.json`, JSON.stringify({ app: "interview-anki", version: 1, state }, null, 1), "application/json");
+  });
+  $("importBtn").addEventListener("click", () => $("importFile").click());
+  $("importFile").addEventListener("change", async (e) => {
+    const f = e.target.files[0]; e.target.value = "";
+    if (!f) return;
+    let data;
+    try { data = JSON.parse(await f.text()); } catch (err) { alert("这个文件不是有效的 JSON。"); return; }
+    if (!data || data.app !== "interview-anki" || !data.state || typeof data.state.cards !== "object") { alert("这个文件不是本站导出的进度。"); return; }
+    if (!confirm("导入会覆盖当前全部进度、标星和笔记文字。继续？")) return;
+    state = Object.assign(blank(), data.state);
+    save();
+    location.reload();
+  });
+  const clearDayCounts = () => { state.days = {}; state.bury = {}; undoStack = []; };
+  $("resetSel").addEventListener("click", () => {
+    const scope = scopeOf(prefs.sel), list = C.filter(c => inScope(c, scope) && state.cards[c.id]);
+    if (!confirm(`清除已勾选牌组里 ${list.length} 张卡的学习进度？标星和笔记会保留。`)) return;
+    list.forEach(c => { delete state.cards[c.id]; delete state.bury[c.id]; });
+    undoStack = [];
+    persist(); renderOverall();
+  });
+  $("resetAll").addEventListener("click", () => {
+    if (!confirm("清除全部学习进度和统计？标星和笔记会保留。")) return;
+    state.cards = {}; clearDayCounts();
+    persist(); renderOverall();
+  });
+
+  // ---------- shell ----------
+  function renderOverall() {
+    const d = today(), n = d.n + d.r + d.l;
+    $("overall").textContent = n ? `今天已学 ${n} 次` : `共 ${C.length} 张卡`;
+  }
+  function renderTabs() {
+    const n = Object.keys(state.notes).filter(hasNote).length;
+    $("tabNotes").textContent = n ? `笔记 (${n})` : "笔记";
+    document.querySelectorAll(".tab").forEach(t => t.setAttribute("aria-selected", t.dataset.tab === prefs.tab));
+    ["study", "browse", "notes", "stats", "settings"].forEach(t => { $("v-" + t).hidden = t !== prefs.tab; });
+  }
+  function showTab(t) {
+    prefs.tab = t; persist(); renderTabs(); $("tip").hidden = true;
+    if (document.activeElement) document.activeElement.blur();
+    if (t === "study") renderStudy();
+    if (t === "browse") renderBrowse();
+    if (t === "notes") renderNotes();
+    if (t === "stats") renderStats();
+    if (t === "settings") loadSettings();
+    window.scrollTo({ top: 0 });
+  }
+  document.querySelectorAll(".tab").forEach(t => t.addEventListener("click", () => showTab(t.dataset.tab)));
+
+  function applyTheme(t) {
+    document.documentElement.setAttribute("data-theme", t);
+    $("theme").textContent = t === "dark" ? "☀" : "☾";
+  }
+  applyTheme(prefs.theme);
+  $("theme").addEventListener("click", () => { prefs.theme = prefs.theme === "dark" ? "light" : "dark"; applyTheme(prefs.theme); persist(); $("theme").blur(); });
+
+  document.addEventListener("keydown", e => {
+    if (e.key === "Escape" && !$("lightbox").hidden) { $("lightbox").hidden = true; return; }
+    if (e.key === "Escape" && document.activeElement && document.activeElement.tagName === "TEXTAREA") { document.activeElement.blur(); return; }
+    if (e.metaKey || e.ctrlKey || e.altKey || ["SELECT", "TEXTAREA", "INPUT"].includes(e.target.tagName)) return;
+    if (prefs.tab !== "study" || !sess) return;
+    const k = e.key.toLowerCase();
+    if (k === "escape") { endSession(); return; }
+    if (k === "z" || k === "u") { undo(); return; }
+    if (!sess.cur) return;
+    if (k === " " || k === "enter") {
+      // Let a focused link or button do its own thing.
+      if (e.target.tagName === "A" || e.target.tagName === "SUMMARY" || (e.target.tagName === "BUTTON" && !e.target.classList.contains("flip") && !e.target.classList.contains("grade"))) return;
+      e.preventDefault();
+      if (sess.revealed) gradeCard(L.GOOD); else reveal();
+    } else if (/^[1-4]$/.test(k)) { if (sess.revealed) gradeCard(+k); else reveal(); }
+    else if (k === "s") toggleStar();
+    else if (k === "b") setAside("bury");
+    else if (k === "x") setAside("susp");
+    else if (k === "l") cycleLang();
+    else if (k === "n" && sess.revealed) {
+      const n = document.querySelector(".mynote");
+      if (n) { n.open = true; const ta = n.querySelector("textarea"); fit(ta); ta.focus(); e.preventDefault(); }
+    }
+  });
+
+  // Another tab saved: adopt its data, or this tab's next save would overwrite it.
+  window.addEventListener("storage", e => {
+    if (e.key !== KEY || !e.newValue) return;
+    try {
+      const s = JSON.parse(e.newValue);
+      ["cards", "days", "bury", "susp", "stars", "notes"].forEach(k => { state[k] = s[k] || {}; });
+    } catch (err) { return; }
+    undoStack = [];
+    renderTabs(); renderOverall();
+    if (document.activeElement && document.activeElement.tagName === "TEXTAREA") return;
+    if (prefs.tab === "study" && !sess) renderHome();
+    else if (prefs.tab === "stats") renderStats();
+    else if (prefs.tab === "notes") renderNotes();
+  });
+
+  buildDeckFilter();
+  renderOverall();
+  showTab(prefs.tab);
+})();
+</script>
+</body>
+</html>
